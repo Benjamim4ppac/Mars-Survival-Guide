@@ -9,6 +9,7 @@ const map = L.map('mars-map', {
     zoom: VIEWS.local.zoom,
     minZoom: 3,
     maxZoom: 15,
+    keyboard: false,
     layers: [nasaLayers.topo]
 });
 
@@ -75,18 +76,21 @@ function getMarsElevationMOLA(lat, lon) {
 }
 
 // 1. Atualiza Coordenadas + Altitude MOLA + Distância da Base no HUD
-map.on('mousemove', (e) => {
-    const lat = e.latlng.lat.toFixed(4);
-    const lon = e.latlng.lng.toFixed(4);
-    const alt = getMarsElevationMOLA(e.latlng.lat, e.latlng.lng);
-    const distFromBaseKm = ((e.latlng.distanceTo([MISSION_CENTER.lat, MISSION_CENTER.lon]) * 0.532) / 1000).toFixed(1);
+function updateCoordsHUD(latlng) {
+    const lat = latlng.lat.toFixed(4);
+    const lon = latlng.lng.toFixed(4);
+    const alt = getMarsElevationMOLA(latlng.lat, latlng.lng);
+    const distFromBaseKm = ((latlng.distanceTo([MISSION_CENTER.lat, MISSION_CENTER.lon]) * 0.532) / 1000).toFixed(1);
     
     const latDir = lat >= 0 ? 'N' : 'S';
     const lonDir = lon >= 0 ? 'E' : 'W';
     
     document.getElementById('coords-display').innerHTML = 
         `LAT: ${Math.abs(lat)}° ${latDir} | LON: ${Math.abs(lon)}° ${lonDir} | <span class="text-amber-400 font-bold">ALT: ${alt.toLocaleString('pt-BR')} m</span> | <span class="text-cyan-300">BASE: ${distFromBaseKm} km</span>`;
-});
+}
+
+map.on('mousemove', (e) => updateCoordsHUD(e.latlng));
+map.on('move', () => updateCoordsHUD(map.getCenter()));
 
 // 2. Alternância Global vs Local (200 km)
 const btnGlobal = document.getElementById('btn-view-global');
@@ -177,6 +181,7 @@ document.getElementById('toggle-hydro').addEventListener('change', (e) => {
 
 // 5. ALVOS DE EXTRAÇÃO ISRU (Dentro dos 200 km)
 const targetsGroup = L.layerGroup().addTo(map);
+const targetMarkers = [];
 
 isruTargets.forEach((pt) => {
     const isBase = pt.type.includes("Habitat");
@@ -198,6 +203,7 @@ isruTargets.forEach((pt) => {
         </div>
     `);
     marker.addTo(targetsGroup);
+    targetMarkers.push({ pt, marker });
 });
 
 document.getElementById('toggle-targets').addEventListener('change', (e) => {
@@ -209,11 +215,11 @@ let routePoints = [];
 let routeLine = null;
 let routeMarkers = [];
 
-map.on('click', (e) => {
+function addRoutePoint(latlng) {
     if (routePoints.length >= 2) clearRoute();
 
-    routePoints.push(e.latlng);
-    const marker = L.circleMarker(e.latlng, {
+    routePoints.push(latlng);
+    const marker = L.circleMarker(latlng, {
         pane: 'missionOverlayPane',
         radius: 5,
         fillColor: '#f8fafc',
@@ -225,7 +231,9 @@ map.on('click', (e) => {
     routeMarkers.push(marker);
 
     if (routePoints.length === 2) drawRouteAndCalculate();
-});
+}
+
+map.on('click', (e) => addRoutePoint(e.latlng));
 
 function isPointInPolygon(latlng, polyLayer) {
     const latlngs = polyLayer.getLatLngs()[0];
@@ -343,3 +351,56 @@ function clearRoute() {
 }
 
 document.getElementById('clear-route').addEventListener('click', clearRoute);
+
+// 7. NAVEGAÇÃO E CONTROLE COMPLETO POR TECLADO
+const baseLayerOrder = ['topo', 'viking', 'mola'];
+let baseLayerIndex = 0;
+
+window.addEventListener('keydown', (e) => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Enter'].includes(e.code)) {
+        e.preventDefault();
+    }
+
+    const key = e.key.toLowerCase();
+    const panStep = 140;
+
+    if (key === 'w' || e.key === 'ArrowUp') {
+        map.panBy([0, -panStep], { animate: true, duration: 0.25 });
+    } else if (key === 's' || e.key === 'ArrowDown') {
+        map.panBy([0, panStep], { animate: true, duration: 0.25 });
+    } else if (key === 'a' || e.key === 'ArrowLeft') {
+        map.panBy([-panStep, 0], { animate: true, duration: 0.25 });
+    } else if (key === 'd' || e.key === 'ArrowRight') {
+        map.panBy([panStep, 0], { animate: true, duration: 0.25 });
+    } else if (key === '+' || key === '=') {
+        map.zoomIn();
+    } else if (key === '-') {
+        map.zoomOut();
+    } else if (key === 'c' || e.key === 'Home') {
+        btnLocal.click();
+    } else if (key === 'g') {
+        btnGlobal.click();
+    } else if (key === 'l') {
+        btnLocal.click();
+    } else if (e.key === 'Enter' || e.code === 'Space') {
+        addRoutePoint(map.getCenter());
+    } else if (['1', '2', '3', '4'].includes(key)) {
+        const idx = parseInt(key, 10) - 1;
+        const item = targetMarkers[idx];
+        if (item) {
+            map.flyTo([item.pt.lat, item.pt.lon], 10, { duration: 0.8 });
+            item.marker.openPopup();
+        }
+    } else if (key === 'h') {
+        document.getElementById('toggle-hydro').click();
+    } else if (key === 'i') {
+        document.getElementById('toggle-targets').click();
+    } else if (key === 'r') {
+        document.getElementById('toggle-hillshade').click();
+    } else if (key === 'b') {
+        baseLayerIndex = (baseLayerIndex + 1) % baseLayerOrder.length;
+        document.querySelector(`input[name="baseLayer"][value="${baseLayerOrder[baseLayerIndex]}"]`)?.click();
+    } else if (key === 'x' || e.key === 'Escape') {
+        clearRoute();
+    }
+});
