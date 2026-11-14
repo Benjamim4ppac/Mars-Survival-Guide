@@ -1,23 +1,23 @@
-// Coordenadas de referência no Valles Marineris
+// Coordenadas exatas do Candor Chasma (Valles Marineris) em Web Mercator
 const VIEWS = {
     global: { center: [-8.5, -68.0], zoom: 4 },    // Visão geral do Valles Marineris
-    local:  { center: [-6.55, -70.85], zoom: 8 }   // Foco nítido no Candor Chasma Central
+    local:  { center: [-6.55, -70.85], zoom: 8 }   // Foco no Candor Chasma Central
 };
 
-// Inicializa o mapa com a base de alta estabilidade
+// Inicializa o mapa com a camada Topográfica (mesma marcada no HTML)
 const map = L.map('mars-map', {
     center: VIEWS.local.center,
     zoom: VIEWS.local.zoom,
     minZoom: 2,
     maxZoom: 15,
-    layers: [nasaLayers.viking]
+    layers: [nasaLayers.topo]
 });
 
-// Painel de alta prioridade para rotas e alvos ficarem sempre por cima das camadas
+// Painel exclusivo acima de todas as camadas para rotas e alvos de água
 map.createPane('missionOverlayPane');
 map.getPane('missionOverlayPane').style.zIndex = 650;
 
-// 1. Atualiza coordenadas reais no HUD ao mover o mouse
+// 1. Atualiza coordenadas no HUD superior esquerdo
 map.on('mousemove', (e) => {
     const lat = e.latlng.lat.toFixed(4);
     const lon = e.latlng.lng.toFixed(4);
@@ -27,7 +27,7 @@ map.on('mousemove', (e) => {
         `LAT: ${Math.abs(lat)}° ${latDir} | LON: ${Math.abs(lon)}° ${lonDir}`;
 });
 
-// 2. Alternância entre Órbita Global e Setor Local (Candor Chasma)
+// 2. Botões de Escala: Órbita Global vs Setor Local (Candor Chasma)
 const btnGlobal = document.getElementById('btn-view-global');
 const btnLocal = document.getElementById('btn-view-local');
 
@@ -51,15 +51,18 @@ btnLocal.addEventListener('click', () => {
     setActiveScaleButton('local');
 });
 
-// 3. Troca de Mosaicos Base (THEMIS, Viking, MOLA) mantendo rotas intactas
-let currentBaseLayer = nasaLayers.themis;
+// 3. Troca de Mosaicos Base (Topo, Viking, MOLA) - Todos alinhados nas mesmas coordenadas!
+let currentBaseLayer = nasaLayers.topo;
 
 document.querySelectorAll('input[name="baseLayer"]').forEach((radio) => {
     radio.addEventListener('change', (e) => {
-        map.removeLayer(currentBaseLayer);
-        currentBaseLayer = nasaLayers[e.target.value];
-        map.addLayer(currentBaseLayer);
-        currentBaseLayer.bringToBack();
+        const selected = e.target.value;
+        if (nasaLayers[selected]) {
+            map.removeLayer(currentBaseLayer);
+            currentBaseLayer = nasaLayers[selected];
+            map.addLayer(currentBaseLayer);
+            currentBaseLayer.bringToBack();
+        }
     });
 });
 
@@ -67,12 +70,13 @@ document.querySelectorAll('input[name="baseLayer"]').forEach((radio) => {
 document.getElementById('toggle-hillshade').addEventListener('change', (e) => {
     if (e.target.checked) {
         map.addLayer(nasaLayers.hillshade);
+        nasaLayers.hillshade.bringToFront();
     } else {
         map.removeLayer(nasaLayers.hillshade);
     }
 });
 
-// 4. Planejador de Rota EVA (Sobreposto a qualquer camada/escala)
+// 4. Planejador de Rota EVA (Persistente em qualquer camada ou zoom)
 let routePoints = [];
 let routeLine = null;
 let routeMarkers = [];
