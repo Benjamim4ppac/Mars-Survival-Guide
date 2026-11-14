@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARES // Valles Marineris ISRU & EVA Planner</title>
+    <title>ARES // Valles Marineris Geological & EVA Planner</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -22,128 +22,143 @@
     <main class="relative flex-1 h-full">
         <div id="mars-map" class="w-full h-full z-0"></div>
 
-        <!-- HUD Superior Esquerdo -->
+        <!-- HUD Superior Esquerdo: Coordenadas + Altitude MOLA em Tempo Real -->
         <div class="absolute top-4 left-14 z-[1000] bg-slate-950/90 backdrop-blur-md border border-slate-800 px-4 py-2.5 rounded-lg shadow-xl">
             <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-                <div class="text-[10px] uppercase tracking-widest text-cyan-400 font-bold">Valles Marineris // Candor Chasma</div>
+                <div class="text-[10px] uppercase tracking-widest text-cyan-400 font-bold">Sistema Valles Marineris // DEM MOLA</div>
             </div>
-            <div id="coords-display" class="font-['JetBrains_Mono'] text-xs text-slate-300 mt-1">
-                LAT: -6.5500° S | LON: -70.8500° W
+            <div id="coords-display" class="font-['JetBrains_Mono'] text-xs text-slate-200 mt-1">
+                LAT: -6.5500° S | LON: -70.8500° W | <span class="text-amber-400 font-bold">ALT: -4.250 m</span>
             </div>
         </div>
 
-        <!-- Seletor Rápido de Escala (Global vs Local) no Topo Direito do Mapa -->
+        <!-- Seletor Rápido de Escala (Órbita Global vs Setor Local) -->
         <div class="absolute top-4 right-4 z-[1000] bg-slate-950/90 backdrop-blur-md border border-slate-800 p-1.5 rounded-lg shadow-xl flex gap-1 font-['JetBrains_Mono'] text-xs">
             <button id="btn-view-global" class="px-3 py-1.5 rounded text-slate-400 hover:text-white transition">
-                ÓRBITA GLOBAL
+                VALLES MARINERIS (GLOBAL)
             </button>
             <button id="btn-view-local" class="px-3 py-1.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold transition">
-                SETOR LOCAL (CANDOR)
+                SETOR CANDOR (LOCAL)
             </button>
+        </div>
+
+        <!-- Legenda Cartográfica Geológica (Estilo Mapa Geológico Oficial) -->
+        <div id="hydro-legend" class="absolute bottom-6 left-4 z-[1000] bg-slate-950/92 backdrop-blur-md border border-slate-800 p-3 rounded-lg shadow-xl text-[11px] space-y-1.5 max-w-xs">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1">Unidades Geológicas & H₂O (USGS/CRISM)</div>
+            <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-sm bg-[#ea580c] border border-orange-300 shrink-0"></span>
+                <span><strong>[Hcs]</strong> Sulfatos Candor-Ophir (~125 L/t)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-sm bg-[#2563eb] border border-blue-300 shrink-0"></span>
+                <span><strong>[Hch]</strong> Canais Eos / Gelo Subsup. (~95 L/t)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-sm bg-[#c026d3] border border-fuchsia-300 shrink-0"></span>
+                <span><strong>[Hvo]</strong> Opala Hidratada Noctis-Ius (~90 L/t)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-sm bg-[#eab308] border border-yellow-300 shrink-0"></span>
+                <span><strong>[Qsu]</strong> Bacia Melas / Hidrogênio WEH (~75 L/t)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-sm bg-[#dc2626] border border-red-300 shrink-0"></span>
+                <span><strong>[Nvu]</strong> Calha Basáltica Coprates (~45 L/t)</span>
+            </div>
         </div>
     </main>
 
     <!-- PAINEL LATERAL DE TELEMETRIA E CONTROLE -->
     <aside class="w-96 bg-slate-950 border-l border-slate-800 h-full flex flex-col justify-between p-5 overflow-y-auto z-10">
-        <div class="space-y-6">
+        <div class="space-y-4">
             <!-- Cabeçalho -->
-            <div class="border-b border-slate-800 pb-4">
+            <div class="border-b border-slate-800 pb-3">
                 <div class="flex items-center justify-between">
                     <h1 class="text-lg font-bold tracking-wider text-white">ARES <span class="text-cyan-400">HYDRO</span></h1>
-                    <span class="px-2 py-0.5 text-[10px] font-['JetBrains_Mono'] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded">CICLO 01</span>
+                    <span class="px-2 py-0.5 text-[10px] font-['JetBrains_Mono'] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded">GEOLOGIA + DEM</span>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Exploração Hídrica & Rotas — Valles Marineris</p>
+                <p class="text-xs text-slate-400 mt-1">Análise Topográfica, Inclinação & Recursos H₂O</p>
             </div>
 
-            <!-- Condições de Fundo de Cânion (Dados Orbitais MOLA / Mars Odyssey) -->
+            <!-- Controle de Camadas Geológicas e Mosaicos -->
             <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Parâmetros do Cânion (-4.2 km)</h2>
-                <div class="grid grid-cols-2 gap-2 font-['JetBrains_Mono']">
-                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-                        <div class="text-[10px] text-slate-400">PRESSÃO ATM.</div>
-                        <div class="text-sm font-bold text-emerald-400 mt-0.5">1.080 Pa</div>
-                    </div>
-                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-                        <div class="text-[10px] text-slate-400">TEMP. MÉDIA</div>
-                        <div class="text-sm font-bold text-cyan-400 mt-0.5">-48 °C</div>
-                    </div>
-                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-                        <div class="text-[10px] text-slate-400">PROFUNDIDADE</div>
-                        <div class="text-sm font-bold text-slate-200 mt-0.5">-4.250 m</div>
-                    </div>
-                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-                        <div class="text-[10px] text-slate-400">META ISRU</div>
-                        <div class="text-sm font-bold text-amber-400 mt-0.5">H₂O / SULFATOS</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Controle de Camadas NASA Mars Trek -->
-            <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Mosaicos & Camadas NASA</h2>
-                <div class="space-y-2 text-xs">
-                    <label class="flex items-center justify-between bg-slate-900/80 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-cyan-500/40">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Camadas Cartográficas</h2>
+                <div class="space-y-1.5 text-xs">
+                    <label class="flex items-center justify-between bg-cyan-950/30 border border-cyan-500/40 p-2 rounded cursor-pointer">
                         <div>
-                            <div class="font-semibold text-slate-200">Topográfico & Curvas (MOLA/USGS)</div>
-                            <div class="text-[10px] text-slate-400">Relevo detalhado com nomenclatura</div>
+                            <div class="font-bold text-cyan-300">Mapa Geológico Valles Marineris</div>
+                            <div class="text-[10px] text-slate-400">Unidades estratigráficas & reservas H₂O</div>
                         </div>
-                        <input type="radio" name="baseLayer" value="topo" checked class="accent-cyan-400">
+                        <input type="checkbox" id="toggle-hydro" checked class="accent-cyan-400 w-4 h-4">
                     </label>
 
-                    <label class="flex items-center justify-between bg-slate-900/80 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-cyan-500/40">
-                        <div>
-                            <div class="font-semibold text-slate-200">Viking Color Mosaic (232m/px)</div>
-                            <div class="text-[10px] text-slate-400">Visão óptica em cores reais</div>
-                        </div>
-                        <input type="radio" name="baseLayer" value="viking" class="accent-cyan-400">
+                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2 rounded cursor-pointer">
+                        <span>Alvos de Extração (ISRU)</span>
+                        <input type="checkbox" id="toggle-targets" checked class="accent-cyan-400">
                     </label>
 
-                    <label class="flex items-center justify-between bg-slate-900/80 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-cyan-500/40">
-                        <div>
-                            <div class="font-semibold text-slate-200">MOLA Altimetria (463m/px)</div>
-                            <div class="text-[10px] text-slate-400">Profundidade do cânion e platôs</div>
-                        </div>
-                        <input type="radio" name="baseLayer" value="mola" class="accent-cyan-400">
+                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2 rounded cursor-pointer">
+                        <span>Relevo Sombreado (Hillshade)</span>
+                        <input type="checkbox" id="toggle-hillshade" class="accent-cyan-400">
                     </label>
 
-                    <div class="pt-2 border-t border-slate-800/80">
-                        <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer">
-                            <span>Sobreposição de Relevo (Hillshade)</span>
-                            <input type="checkbox" id="toggle-hillshade" class="accent-cyan-400">
+                    <div class="pt-1.5 grid grid-cols-3 gap-1.5 text-center">
+                        <label class="bg-slate-900 border border-slate-800 p-1.5 rounded cursor-pointer hover:border-cyan-500/40">
+                            <input type="radio" name="baseLayer" value="topo" checked class="accent-cyan-400 block mx-auto mb-0.5">
+                            <span class="text-[11px]">Topográfico</span>
+                        </label>
+                        <label class="bg-slate-900 border border-slate-800 p-1.5 rounded cursor-pointer hover:border-cyan-500/40">
+                            <input type="radio" name="baseLayer" value="viking" class="accent-cyan-400 block mx-auto mb-0.5">
+                            <span class="text-[11px]">Viking</span>
+                        </label>
+                        <label class="bg-slate-900 border border-slate-800 p-1.5 rounded cursor-pointer hover:border-cyan-500/40">
+                            <input type="radio" name="baseLayer" value="mola" class="accent-cyan-400 block mx-auto mb-0.5">
+                            <span class="text-[11px]">MOLA Alt.</span>
                         </label>
                     </div>
                 </div>
             </div>
 
-            <!-- Planejador de Rota EVA (Persistente entre Global e Local) -->
-            <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-lg">
-                <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400">Traçado de Rota EVA</h2>
+            <!-- Planejador de Missão EVA: Altitude, Inclinação e Consumo Real de O2 -->
+            <div class="bg-slate-900/90 border border-slate-800 p-3.5 rounded-lg">
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400">Telemetria de Deslocamento</h2>
                     <button id="clear-route" class="text-[11px] text-slate-400 hover:text-white underline">Limpar</button>
                 </div>
-                <p class="text-xs text-slate-400 mb-3">Clique em dois pontos no mapa. A rota permanece alinhada ao alternar entre visão Global e Local.</p>
+                <p class="text-[11px] text-slate-400 mb-2.5">Clique em 2 pontos para medir distância, variação de altitude, inclinação e gasto de O₂ (Tanque: 540g).</p>
                 
-                <div class="space-y-2 font-['JetBrains_Mono'] text-xs border-t border-slate-800 pt-3">
+                <div class="space-y-1.5 font-['JetBrains_Mono'] text-xs border-t border-slate-800 pt-2.5">
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Distância Marciana:</span>
+                        <span class="text-slate-400">Distância EVA:</span>
                         <span id="route-distance" class="text-white font-bold">0.00 km</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Consumo Base O₂:</span>
-                        <span id="route-o2" class="text-cyan-400 font-bold">0%</span>
+                        <span class="text-slate-400">Variação Altitude (Δh):</span>
+                        <span id="route-elevation" class="text-amber-300 font-bold">0 m</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Status da Rota:</span>
-                        <span id="route-status" class="text-slate-500">AGUARDANDO PONTOS</span>
+                        <span class="text-slate-400">Inclinação Máxima:</span>
+                        <span id="route-slope" class="text-slate-200 font-bold">0.0°</span>
+                    </div>
+                    <div class="flex justify-between border-t border-slate-800/80 pt-1.5">
+                        <span class="text-slate-400">Consumo O₂ (xEMU):</span>
+                        <span id="route-o2" class="text-cyan-400 font-bold">0g (0%)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Unidade Geológica:</span>
+                        <span id="route-resource" class="text-slate-500 text-right">--</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Potencial H₂O:</span>
+                        <span id="route-yield" class="text-emerald-400 font-bold">0 L/ton</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Rodapé -->
-        <div class="text-[11px] text-slate-500 border-t border-slate-800 pt-3">
-            Projeção: EPSG:4326 // NASA Mars Trek WMTS
+        <div class="text-[10px] text-slate-500 border-t border-slate-800 pt-2">
+            Física EVA: 25g O₂/km + 0.18g/m subida // MOLA DEM
         </div>
     </aside>
 

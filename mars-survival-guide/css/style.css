@@ -3,7 +3,14 @@
     background-color: #07090f;
 }
 
-/* Deixa os controles de zoom do Leaflet em tema escuro */
+/* Efeito Espectral Orbital (CRISM/HEND): manchas suaves integradas ao relevo sem bordas duras */
+.leaflet-geologyPane-pane {
+    mix-blend-mode: multiply;
+    filter: blur(3px);
+    opacity: 0.78;
+}
+
+/* Controles de zoom em tema escuro */
 .leaflet-control-zoom a {
     background-color: #0f172a !important;
     color: #e2e8f0 !important;
@@ -14,7 +21,7 @@
     background-color: #1e293b !important;
 }
 
-/* Customização dos popups no mapa */
+/* Popups aeroespaciais */
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
     background-color: #0f172a;
     color: #f8fafc;
