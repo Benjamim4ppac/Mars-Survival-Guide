@@ -5,9 +5,8 @@
 
 /* Efeito Espectral Orbital (CRISM/HEND): manchas suaves integradas ao relevo sem bordas duras */
 .leaflet-geologyPane-pane {
-    mix-blend-mode: multiply;
-    filter: blur(3px);
-    opacity: 0.78;
+    mix-blend-mode: screen;
+    opacity: 0.85;
 }
 
 /* Controles de zoom em tema escuro */

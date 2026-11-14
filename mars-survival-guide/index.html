@@ -43,94 +43,149 @@
             </button>
         </div>
 
-        <!-- Legenda Cartográfica Geológica (Estilo Mapa Geológico Oficial) -->
-        <div id="hydro-legend" class="absolute bottom-6 left-4 z-[1000] bg-slate-950/92 backdrop-blur-md border border-slate-800 p-3 rounded-lg shadow-xl text-[11px] space-y-1.5 max-w-xs">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1">Unidades Geológicas & H₂O (USGS/CRISM)</div>
-            <div class="flex items-center gap-2">
-                <span class="w-3.5 h-3.5 rounded-sm bg-[#ea580c] border border-orange-300 shrink-0"></span>
-                <span><strong>[Hcs]</strong> Sulfatos Candor-Ophir (~125 L/t)</span>
+        <!-- Painel Flutuante de Diagnóstico Científico & Engenharia de Missão (Para Avaliação) -->
+        <div id="mission-diagnosis-card" class="absolute bottom-6 left-4 z-[1000] max-w-md bg-slate-950/95 backdrop-blur-md border border-cyan-500/40 rounded-lg shadow-2xl text-slate-200 transition-all">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-cyan-950/50 border-b border-cyan-500/30 rounded-t-lg">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">Diagnóstico Científico & Viabilidade</span>
+                </div>
+                <button id="toggle-diagnosis-btn" class="text-[11px] font-['JetBrains_Mono'] text-slate-300 hover:text-white px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">
+                    Minimizar
+                </button>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="w-3.5 h-3.5 rounded-sm bg-[#2563eb] border border-blue-300 shrink-0"></span>
-                <span><strong>[Hch]</strong> Canais Eos / Gelo Subsup. (~95 L/t)</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="w-3.5 h-3.5 rounded-sm bg-[#c026d3] border border-fuchsia-300 shrink-0"></span>
-                <span><strong>[Hvo]</strong> Opala Hidratada Noctis-Ius (~90 L/t)</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="w-3.5 h-3.5 rounded-sm bg-[#eab308] border border-yellow-300 shrink-0"></span>
-                <span><strong>[Qsu]</strong> Bacia Melas / Hidrogênio WEH (~75 L/t)</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="w-3.5 h-3.5 rounded-sm bg-[#dc2626] border border-red-300 shrink-0"></span>
-                <span><strong>[Nvu]</strong> Calha Basáltica Coprates (~45 L/t)</span>
+
+            <div id="diagnosis-content" class="p-4 space-y-2.5 text-xs leading-relaxed">
+                <!-- 1. Justificativa do Pouso -->
+                <div class="bg-slate-900/90 border-l-2 border-red-500 pl-3 py-1.5 rounded-r">
+                    <div class="font-bold text-red-300 uppercase text-[10px] tracking-wider">1. Critério de Pouso Seguro</div>
+                    <p id="diag-landing-text" class="text-slate-300 mt-0.5">Analisando topografia e unidades geológicas...</p>
+                </div>
+
+                <!-- 2. Evidência Hídrica -->
+                <div class="bg-slate-900/90 border-l-2 border-cyan-400 pl-3 py-1.5 rounded-r">
+                    <div class="font-bold text-cyan-300 uppercase text-[10px] tracking-wider">2. Evidência Espectral & Hídrica</div>
+                    <p id="diag-water-text" class="text-slate-300 mt-0.5">Calculando potencial de extração ISRU...</p>
+                </div>
+
+                <!-- 3. Validação da Rota A* -->
+                <div class="bg-slate-900/90 border-l-2 border-amber-400 pl-3 py-1.5 rounded-r">
+                    <div class="font-bold text-amber-300 uppercase text-[10px] tracking-wider">3. Engenharia de Trânsito (Algoritmo A*)</div>
+                    <p id="diag-route-text" class="text-slate-300 mt-0.5">Otimizando trajetória pelo relevo MOLA...</p>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-[10px] font-['JetBrains_Mono'] text-slate-400">
+                    <span>Fonte: USGS Coprates (McCauley, 1978)</span>
+                    <span id="diag-status-badge" class="text-emerald-400 font-bold">MISSÃO VIÁVEL ✓</span>
+                </div>
             </div>
         </div>
     </main>
 
     <!-- PAINEL LATERAL DE TELEMETRIA E CONTROLE -->
-    <aside class="w-96 bg-slate-950 border-l border-slate-800 h-full flex flex-col justify-between p-5 overflow-y-auto z-10">
-        <div class="space-y-4">
+    <aside style="width: 430px; min-width: 430px; font-size: 14px;" class="shrink-0 bg-slate-950 border-l border-slate-800 h-full flex flex-col justify-between p-6 overflow-y-auto z-20 shadow-2xl">
+        <div class="space-y-5">
             <!-- Cabeçalho -->
-            <div class="border-b border-slate-800 pb-3">
+            <div class="border-b border-slate-800 pb-4">
                 <div class="flex items-center justify-between">
-                    <h1 class="text-lg font-bold tracking-wider text-white">ARES <span class="text-cyan-400">HYDRO</span></h1>
-                    <span class="px-2 py-0.5 text-[10px] font-['JetBrains_Mono'] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded">GEOLOGIA + DEM</span>
+                    <h1 class="text-xl font-bold tracking-wider text-white">ARES <span class="text-cyan-400">HYDRO</span></h1>
+                    <span class="px-2.5 py-1 text-xs font-['JetBrains_Mono'] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded">RAIO 400 KM</span>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Análise Topográfica, Inclinação & Recursos H₂O</p>
+                <p class="text-xs text-slate-400 mt-1">Carta Geológica Coprates (USGS 1978) & Recursos H₂O</p>
+            </div>
+
+            <!-- Card Estratégico da Missão (Atualizado dinamicamente pelo app.js) -->
+            <div class="bg-gradient-to-br from-slate-900 to-cyan-950/40 border border-cyan-500/40 p-4 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">Missão Tripulada Ativa</span>
+                    <span class="px-2 py-0.5 text-xs font-['JetBrains_Mono'] bg-emerald-500/20 text-emerald-300 rounded">EVA / ROVER</span>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-3 h-3 rounded-full bg-red-500 ring-2 ring-white/80 shrink-0"></span>
+                        <span class="text-slate-200 font-medium">Base de Pouso:</span>
+                        <span id="mission-landing-unit" class="font-['JetBrains_Mono'] text-red-300 font-bold ml-auto">--</span>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-3 h-3 rounded-full bg-cyan-400 ring-2 ring-white/80 shrink-0"></span>
+                        <span class="text-slate-200 font-medium">Alvo Hídrico:</span>
+                        <span id="mission-target-unit" class="font-['JetBrains_Mono'] text-cyan-300 font-bold ml-auto">--</span>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 mt-2 border-t border-slate-800 font-['JetBrains_Mono'] text-xs">
+                        <span class="text-slate-400">Distância Base → Alvo:</span>
+                        <span id="mission-target-dist" class="text-amber-300 font-bold text-sm">-- km</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Controle de Camadas Geológicas e Mosaicos -->
             <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Camadas Cartográficas</h2>
-                <div class="space-y-1.5 text-xs">
-                    <label class="flex items-center justify-between bg-cyan-950/30 border border-cyan-500/40 p-2 rounded cursor-pointer">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Camadas & Materiais (≤ 400 km)</h2>
+                <div class="space-y-2 text-sm">
+                    <!-- Toggle 1: Mapa Geológico + Tabela de Cores -->
+                    <label class="flex items-center justify-between bg-cyan-950/30 border border-cyan-500/40 p-3 rounded cursor-pointer hover:bg-cyan-950/50 transition">
                         <div>
-                            <div class="font-bold text-cyan-300">Mapa Geológico Valles Marineris</div>
-                            <div class="text-[10px] text-slate-400">Unidades estratigráficas & reservas H₂O</div>
+                            <div class="font-bold text-cyan-300">Mapa Geológico Candor</div>
+                            <div class="text-xs text-slate-400">Exibe polígonos e legenda de cores</div>
                         </div>
                         <input type="checkbox" id="toggle-hydro" checked class="accent-cyan-400 w-4 h-4">
                     </label>
 
-                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2 rounded cursor-pointer">
-                        <span>Alvos de Extração (ISRU)</span>
-                        <input type="checkbox" id="toggle-targets" checked class="accent-cyan-400">
+                    <!-- Tabela Dinâmica das Cores e Materiais (ÚNICA no documento) -->
+                    <div id="hydro-legend" class="bg-slate-900/95 border border-slate-800 rounded-md overflow-hidden">
+                        <div class="bg-slate-800/80 px-3 py-1.5 flex justify-between text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                            <span>Cor / Unidade Geológica</span>
+                            <span>H₂O Est.</span>
+                        </div>
+                        <div id="hydro-legend-body" class="divide-y divide-slate-800/70 max-h-52 overflow-y-auto px-3 py-1">
+                            <div class="text-xs text-slate-400 py-2">Carregando unidades do GeoJSON...</div>
+                        </div>
+                    </div>
+
+                    <!-- Toggle 2: Alvos de Extração (Base + Alvo + Rota) -->
+                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
+                        <div>
+                            <div class="font-medium text-slate-200">Alvos de Extração (ISRU)</div>
+                            <div class="text-[11px] text-slate-400">Exibe Base, Alvo Hídrico e Rota</div>
+                        </div>
+                        <input type="checkbox" id="toggle-targets" checked class="accent-cyan-400 w-4 h-4">
                     </label>
 
-                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2 rounded cursor-pointer">
+                    <!-- Toggle 3: Relevo Sombreado -->
+                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
                         <span>Relevo Sombreado (Hillshade)</span>
-                        <input type="checkbox" id="toggle-hillshade" class="accent-cyan-400">
+                        <input type="checkbox" id="toggle-hillshade" checked class="accent-cyan-400 w-4 h-4">
                     </label>
 
-                    <div class="pt-1.5 grid grid-cols-3 gap-1.5 text-center">
-                        <label class="bg-slate-900 border border-slate-800 p-1.5 rounded cursor-pointer hover:border-cyan-500/40">
-                            <input type="radio" name="baseLayer" value="topo" checked class="accent-cyan-400 block mx-auto mb-0.5">
-                            <span class="text-[11px]">Topográfico</span>
+                    <!-- Mosaicos Base -->
+                    <div class="pt-1 grid grid-cols-3 gap-2 text-center">
+                        <label class="bg-slate-900 border border-slate-800 p-2 rounded cursor-pointer hover:border-cyan-500/40">
+                            <input type="radio" name="baseLayer" value="topo" checked class="accent-cyan-400 block mx-auto mb-1">
+                            <span class="text-xs">Topográfico</span>
                         </label>
-                        <label class="bg-slate-900 border border-slate-800 p-1.5 rounded cursor-pointer hover:border-cyan-500/40">
-                            <input type="radio" name="baseLayer" value="viking" class="accent-cyan-400 block mx-auto mb-0.5">
-                            <span class="text-[11px]">Viking</span>
+                        <label class="bg-slate-900 border border-slate-800 p-2 rounded cursor-pointer hover:border-cyan-500/40">
+                            <input type="radio" name="baseLayer" value="viking" class="accent-cyan-400 block mx-auto mb-1">
+                            <span class="text-xs">Viking</span>
                         </label>
-                        <label class="bg-slate-900 border border-slate-800 p-1.5 rounded cursor-pointer hover:border-cyan-500/40">
-                            <input type="radio" name="baseLayer" value="mola" class="accent-cyan-400 block mx-auto mb-0.5">
-                            <span class="text-[11px]">MOLA Alt.</span>
+                        <label class="bg-slate-900 border border-slate-800 p-2 rounded cursor-pointer hover:border-cyan-500/40">
+                            <input type="radio" name="baseLayer" value="mola" class="accent-cyan-400 block mx-auto mb-1">
+                            <span class="text-xs">MOLA Alt.</span>
                         </label>
                     </div>
                 </div>
             </div>
 
-            <!-- Planejador de Missão EVA: Altitude, Inclinação e Consumo Real de O2 -->
-            <div class="bg-slate-900/90 border border-slate-800 p-3.5 rounded-lg">
-                <div class="flex items-center justify-between mb-1">
+            <!-- Planejador de Missão EVA / Rover -->
+            <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-lg">
+                <div class="flex items-center justify-between mb-1.5">
                     <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400">Telemetria de Deslocamento</h2>
-                    <button id="clear-route" class="text-[11px] text-slate-400 hover:text-white underline">Limpar</button>
+                    <button id="clear-route" class="text-xs text-slate-400 hover:text-white underline">Limpar</button>
                 </div>
-                <p class="text-[11px] text-slate-400 mb-2.5">Clique em 2 pontos para medir distância, variação de altitude, inclinação e gasto de O₂ (Tanque: 540g).</p>
+                <p class="text-xs text-slate-400 mb-3">Clique em 2 pontos no mapa para traçar rota otimizada A*, Δh, inclinação, O₂ e energia (kWh).</p>
                 
-                <div class="space-y-1.5 font-['JetBrains_Mono'] text-xs border-t border-slate-800 pt-2.5">
+                <div class="space-y-2 font-['JetBrains_Mono'] text-xs border-t border-slate-800 pt-3">
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Distância EVA:</span>
+                        <span class="text-slate-400">Distância Rota A*:</span>
                         <span id="route-distance" class="text-white font-bold">0.00 km</span>
                     </div>
                     <div class="flex justify-between">
@@ -141,9 +196,9 @@
                         <span class="text-slate-400">Inclinação Máxima:</span>
                         <span id="route-slope" class="text-slate-200 font-bold">0.0°</span>
                     </div>
-                    <div class="flex justify-between border-t border-slate-800/80 pt-1.5">
-                        <span class="text-slate-400">Consumo O₂ (xEMU):</span>
-                        <span id="route-o2" class="text-cyan-400 font-bold">0g (0%)</span>
+                    <div class="flex justify-between border-t border-slate-800 pt-2">
+                        <span class="text-slate-400">Consumo O₂ / Energia:</span>
+                        <span id="route-o2" class="text-cyan-400 font-bold">0g O₂ | 0.0 kWh</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-400">Unidade Geológica:</span>
@@ -157,8 +212,8 @@
             </div>
         </div>
 
-        <div class="text-[10px] text-slate-500 border-t border-slate-800 pt-2">
-            Física EVA: 25g O₂/km + 0.18g/m subida // MOLA DEM
+        <div class="text-xs text-slate-500 border-t border-slate-800 pt-3 mt-4">
+            Ref: J. F. McCauley (1978) Coprates Quadrangle // MOLA DEM
         </div>
     </aside>
 
