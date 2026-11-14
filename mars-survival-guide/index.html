@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -43,65 +43,48 @@
                 <p class="text-xs text-slate-400 mt-1">Sistema de Planejamento de Marswalk (EVA)</p>
             </div>
 
-<!-- Condições Ambientais Interativas (Dados MEDA / Perseverance) -->
-<div>
-    <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Clima & Poeira (MEDA)</h2>
-        <select id="weather-scenario" class="bg-slate-900 border border-slate-700 text-[11px] text-orange-400 rounded px-2 py-0.5 font-['JetBrains_Mono']">
-            <option value="nominal">Sol Limpo (Nominal)</option>
-            <option value="dusty">Vento / Poeira Alta</option>
-            <option value="storm">Tempestade Regional</option>
-        </select>
-    </div>
-    <div class="grid grid-cols-2 gap-2 font-['JetBrains_Mono']">
-        <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-            <div class="text-[10px] text-slate-400">TEMP. SUPERFÍCIE</div>
-            <div id="meda-temp" class="text-sm font-bold text-cyan-400 mt-0.5">-63 °C</div>
-        </div>
-        <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-            <div class="text-[10px] text-slate-400">VENTO LOCAL</div>
-            <div id="meda-wind" class="text-sm font-bold text-slate-200 mt-0.5">4.2 m/s NE</div>
-        </div>
-        <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-            <div class="text-[10px] text-slate-400">RADIAÇÃO UV</div>
-            <div id="meda-uv" class="text-sm font-bold text-amber-400 mt-0.5">ALTA (8.4)</div>
-        </div>
-        <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
-            <div class="text-[10px] text-slate-400">OPACIDADE (TAU)</div>
-            <div id="meda-tau" class="text-sm font-bold text-emerald-400 mt-0.5">0.42 (Boa)</div>
-        </div>
-    </div>
-</div>
+            <!-- Condições Ambientais (Dados MEDA / Perseverance) -->
+            <div>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Telemetria Local (MEDA)</h2>
+                <div class="grid grid-cols-2 gap-2.5 font-['JetBrains_Mono']">
+                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
+                        <div class="text-[10px] text-slate-400">TEMP. SUPERFÍCIE</div>
+                        <div class="text-sm font-bold text-cyan-400 mt-1">-63 °C</div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
+                        <div class="text-[10px] text-slate-400">PRESSÃO ATM.</div>
+                        <div class="text-sm font-bold text-slate-200 mt-1">720 Pa</div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
+                        <div class="text-[10px] text-slate-400">RADIAÇÃO UV</div>
+                        <div class="text-sm font-bold text-amber-400 mt-1">ALTA (8.4)</div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
+                        <div class="text-[10px] text-slate-400">POEIRA / OPACIDADE</div>
+                        <div class="text-sm font-bold text-emerald-400 mt-1">0.42 Tau</div>
+                    </div>
+                </div>
+            </div>
 
-<!-- Controle de Camadas (Base + Overlays) -->
-<div>
-    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Camadas Geoespaciais</h2>
-    <div class="space-y-1.5 text-xs">
-        <div class="grid grid-cols-2 gap-1.5 mb-2">
-            <label class="flex items-center justify-center gap-1.5 bg-slate-900 border border-slate-800 p-2 rounded cursor-pointer hover:border-orange-500/50">
-                <input type="radio" name="baseLayer" value="viking" checked class="accent-orange-500">
-                <span>Óptico (Viking)</span>
-            </label>
-            <label class="flex items-center justify-center gap-1.5 bg-slate-900 border border-slate-800 p-2 rounded cursor-pointer hover:border-orange-500/50">
-                <input type="radio" name="baseLayer" value="mola" class="accent-orange-500">
-                <span>Elevação (MOLA)</span>
-            </label>
-        </div>
+            <!-- Controle de Camadas Científicas -->
+            <div>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Camadas de Missões NASA</h2>
+                <div class="space-y-2 text-sm">
+                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
+                        <span>Mosaico Viking (Base Óptica)</span>
+                        <input type="radio" name="baseLayer" value="viking" checked class="accent-orange-500">
+                    </label>
+                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
+                        <span>Topografia MOLA (Elevação)</span>
+                        <input type="radio" name="baseLayer" value="mola" class="accent-orange-500">
+                    </label>
+                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
+                        <span>Alvos Científicos (GeoJSON)</span>
+                        <input type="checkbox" id="toggle-waypoints" checked class="accent-orange-500">
+                    </label>
+                </div>
+            </div>
 
-        <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2 rounded cursor-pointer">
-            <span>Relevo Sombreado (Hillshade)</span>
-            <input type="checkbox" id="toggle-hillshade" class="accent-orange-500">
-        </label>
-        <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2 rounded cursor-pointer">
-            <span>Inclinação & Terreno (Slope)</span>
-            <input type="checkbox" id="toggle-hazards" checked class="accent-red-500">
-        </label>
-        <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2 rounded cursor-pointer">
-            <span>Alvos Científicos (CRISM)</span>
-            <input type="checkbox" id="toggle-waypoints" checked class="accent-cyan-500">
-        </label>
-    </div>
-</div>
             <!-- Planejador de Rota EVA -->
             <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-lg">
                 <div class="flex items-center justify-between mb-2">
