@@ -1,9 +1,9 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARES // Martian Survival & EVA Planner</title>
+    <title>ARES // Valles Marineris ISRU & EVA Planner</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,93 +18,124 @@
 </head>
 <body class="bg-[#0B0D17] text-slate-200 font-['Inter'] h-screen w-screen overflow-hidden flex">
 
-    <!-- ÁREA PRINCIPAL DO MAPA (75% a 80% da tela) -->
+    <!-- ÁREA PRINCIPAL DO MAPA -->
     <main class="relative flex-1 h-full">
         <div id="mars-map" class="w-full h-full z-0"></div>
 
-        <!-- HUD Superior Esquerdo (Coordenadas em tempo real) -->
-        <div class="absolute top-4 left-14 z-[1000] bg-slate-950/85 backdrop-blur-md border border-slate-800 px-4 py-2 rounded-lg shadow-lg">
-            <div class="text-[10px] uppercase tracking-widest text-orange-400 font-bold">Região: Cratera Jezero</div>
-            <div id="coords-display" class="font-['JetBrains_Mono'] text-xs text-slate-300 mt-0.5">
-                LAT: 18.3800° N | LON: 77.5800° E
+        <!-- HUD Superior Esquerdo -->
+        <div class="absolute top-4 left-14 z-[1000] bg-slate-950/90 backdrop-blur-md border border-slate-800 px-4 py-2.5 rounded-lg shadow-xl">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <div class="text-[10px] uppercase tracking-widest text-cyan-400 font-bold">Valles Marineris // Candor Chasma</div>
             </div>
+            <div id="coords-display" class="font-['JetBrains_Mono'] text-xs text-slate-300 mt-1">
+                LAT: -6.5500° S | LON: -70.8500° W
+            </div>
+        </div>
+
+        <!-- Seletor Rápido de Escala (Global vs Local) no Topo Direito do Mapa -->
+        <div class="absolute top-4 right-4 z-[1000] bg-slate-950/90 backdrop-blur-md border border-slate-800 p-1.5 rounded-lg shadow-xl flex gap-1 font-['JetBrains_Mono'] text-xs">
+            <button id="btn-view-global" class="px-3 py-1.5 rounded text-slate-400 hover:text-white transition">
+                ÓRBITA GLOBAL
+            </button>
+            <button id="btn-view-local" class="px-3 py-1.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold transition">
+                SETOR LOCAL (CANDOR)
+            </button>
         </div>
     </main>
 
-    <!-- PAINEL LATERAL DE TELEMETRIA E CONTROLE (Sidebar) -->
+    <!-- PAINEL LATERAL DE TELEMETRIA E CONTROLE -->
     <aside class="w-96 bg-slate-950 border-l border-slate-800 h-full flex flex-col justify-between p-5 overflow-y-auto z-10">
         <div class="space-y-6">
             <!-- Cabeçalho -->
             <div class="border-b border-slate-800 pb-4">
                 <div class="flex items-center justify-between">
-                    <h1 class="text-lg font-bold tracking-wider text-white">ARES <span class="text-orange-500">NAV</span></h1>
-                    <span class="px-2 py-0.5 text-[10px] font-['JetBrains_Mono'] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">ONLINE</span>
+                    <h1 class="text-lg font-bold tracking-wider text-white">ARES <span class="text-cyan-400">HYDRO</span></h1>
+                    <span class="px-2 py-0.5 text-[10px] font-['JetBrains_Mono'] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded">CICLO 01</span>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Sistema de Planejamento de Marswalk (EVA)</p>
+                <p class="text-xs text-slate-400 mt-1">Exploração Hídrica & Rotas — Valles Marineris</p>
             </div>
 
-            <!-- Condições Ambientais (Dados MEDA / Perseverance) -->
+            <!-- Condições de Fundo de Cânion (Dados Orbitais MOLA / Mars Odyssey) -->
             <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Telemetria Local (MEDA)</h2>
-                <div class="grid grid-cols-2 gap-2.5 font-['JetBrains_Mono']">
-                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
-                        <div class="text-[10px] text-slate-400">TEMP. SUPERFÍCIE</div>
-                        <div class="text-sm font-bold text-cyan-400 mt-1">-63 °C</div>
-                    </div>
-                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Parâmetros do Cânion (-4.2 km)</h2>
+                <div class="grid grid-cols-2 gap-2 font-['JetBrains_Mono']">
+                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
                         <div class="text-[10px] text-slate-400">PRESSÃO ATM.</div>
-                        <div class="text-sm font-bold text-slate-200 mt-1">720 Pa</div>
+                        <div class="text-sm font-bold text-emerald-400 mt-0.5">1.080 Pa</div>
                     </div>
-                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
-                        <div class="text-[10px] text-slate-400">RADIAÇÃO UV</div>
-                        <div class="text-sm font-bold text-amber-400 mt-1">ALTA (8.4)</div>
+                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
+                        <div class="text-[10px] text-slate-400">TEMP. MÉDIA</div>
+                        <div class="text-sm font-bold text-cyan-400 mt-0.5">-48 °C</div>
                     </div>
-                    <div class="bg-slate-900/90 border border-slate-800 p-3 rounded">
-                        <div class="text-[10px] text-slate-400">POEIRA / OPACIDADE</div>
-                        <div class="text-sm font-bold text-emerald-400 mt-1">0.42 Tau</div>
+                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
+                        <div class="text-[10px] text-slate-400">PROFUNDIDADE</div>
+                        <div class="text-sm font-bold text-slate-200 mt-0.5">-4.250 m</div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded">
+                        <div class="text-[10px] text-slate-400">META ISRU</div>
+                        <div class="text-sm font-bold text-amber-400 mt-0.5">H₂O / SULFATOS</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Controle de Camadas Científicas -->
+            <!-- Controle de Camadas NASA Mars Trek -->
             <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Camadas de Missões NASA</h2>
-                <div class="space-y-2 text-sm">
-                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
-                        <span>Mosaico Viking (Base Óptica)</span>
-                        <input type="radio" name="baseLayer" value="viking" checked class="accent-orange-500">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Mosaicos & Camadas NASA</h2>
+                <div class="space-y-2 text-xs">
+                    <label class="flex items-center justify-between bg-slate-900/80 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-cyan-500/40">
+                        <div>
+                            <div class="font-semibold text-slate-200">THEMIS Day IR (100m/px)</div>
+                            <div class="text-[10px] text-slate-400">Alta nitidez estrutural e falhas</div>
+                        </div>
+                        <input type="radio" name="baseLayer" value="themis" checked class="accent-cyan-400">
                     </label>
-                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
-                        <span>Topografia MOLA (Elevação)</span>
-                        <input type="radio" name="baseLayer" value="mola" class="accent-orange-500">
+
+                    <label class="flex items-center justify-between bg-slate-900/80 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-cyan-500/40">
+                        <div>
+                            <div class="font-semibold text-slate-200">Viking Color Mosaic (232m/px)</div>
+                            <div class="text-[10px] text-slate-400">Visão óptica em cores reais</div>
+                        </div>
+                        <input type="radio" name="baseLayer" value="viking" class="accent-cyan-400">
                     </label>
-                    <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-slate-700">
-                        <span>Alvos Científicos (GeoJSON)</span>
-                        <input type="checkbox" id="toggle-waypoints" checked class="accent-orange-500">
+
+                    <label class="flex items-center justify-between bg-slate-900/80 border border-slate-800 p-2.5 rounded cursor-pointer hover:border-cyan-500/40">
+                        <div>
+                            <div class="font-semibold text-slate-200">MOLA Altimetria (463m/px)</div>
+                            <div class="text-[10px] text-slate-400">Profundidade do cânion e platôs</div>
+                        </div>
+                        <input type="radio" name="baseLayer" value="mola" class="accent-cyan-400">
                     </label>
+
+                    <div class="pt-2 border-t border-slate-800/80">
+                        <label class="flex items-center justify-between bg-slate-900/60 border border-slate-800 p-2.5 rounded cursor-pointer">
+                            <span>Sobreposição de Relevo (Hillshade)</span>
+                            <input type="checkbox" id="toggle-hillshade" class="accent-cyan-400">
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            <!-- Planejador de Rota EVA -->
+            <!-- Planejador de Rota EVA (Persistente entre Global e Local) -->
             <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-lg">
                 <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-xs font-bold uppercase tracking-wider text-orange-400">Planejador de Rota EVA</h2>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400">Traçado de Rota EVA</h2>
                     <button id="clear-route" class="text-[11px] text-slate-400 hover:text-white underline">Limpar</button>
                 </div>
-                <p class="text-xs text-slate-400 mb-3">Clique em dois pontos no mapa para traçar a caminhada.</p>
+                <p class="text-xs text-slate-400 mb-3">Clique em dois pontos no mapa. A rota permanece alinhada ao alternar entre visão Global e Local.</p>
                 
                 <div class="space-y-2 font-['JetBrains_Mono'] text-xs border-t border-slate-800 pt-3">
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Distância Total:</span>
+                        <span class="text-slate-400">Distância Marciana:</span>
                         <span id="route-distance" class="text-white font-bold">0.00 km</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Consumo Estimado O₂:</span>
+                        <span class="text-slate-400">Consumo Base O₂:</span>
                         <span id="route-o2" class="text-cyan-400 font-bold">0%</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Status de Segurança:</span>
-                        <span id="route-status" class="text-slate-500">AGUARDANDO ROTA</span>
+                        <span class="text-slate-400">Status da Rota:</span>
+                        <span id="route-status" class="text-slate-500">AGUARDANDO PONTOS</span>
                     </div>
                 </div>
             </div>
@@ -112,7 +143,7 @@
 
         <!-- Rodapé -->
         <div class="text-[11px] text-slate-500 border-t border-slate-800 pt-3">
-            Dados: NASA Mars Trek WMTS / PDS
+            Projeção: EPSG:4326 // NASA Mars Trek WMTS
         </div>
     </aside>
 

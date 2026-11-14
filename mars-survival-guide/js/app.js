@@ -1,64 +1,78 @@
-// Inicializa o mapa focado na Cratera Jezero
+// Coordenadas de referência no Valles Marineris
+const VIEWS = {
+    global: { center: [-8.5, -68.0], zoom: 4 },    // Visão geral do Valles Marineris
+    local:  { center: [-6.55, -70.85], zoom: 8 }   // Foco nítido no Candor Chasma Central
+};
+
+// Inicializa o mapa com a base de alta estabilidade
 const map = L.map('mars-map', {
-    center: [18.4447, 77.4508],
-    zoom: 7,
+    center: VIEWS.local.center,
+    zoom: VIEWS.local.zoom,
+    minZoom: 2,
+    maxZoom: 15,
     layers: [nasaLayers.viking]
 });
 
-// 1. Atualiza coordenadas ao mover o mouse
+// Painel de alta prioridade para rotas e alvos ficarem sempre por cima das camadas
+map.createPane('missionOverlayPane');
+map.getPane('missionOverlayPane').style.zIndex = 650;
+
+// 1. Atualiza coordenadas reais no HUD ao mover o mouse
 map.on('mousemove', (e) => {
     const lat = e.latlng.lat.toFixed(4);
     const lon = e.latlng.lng.toFixed(4);
-    document.getElementById('coords-display').innerText = `LAT: ${lat}° | LON: ${lon}°`;
+    const latDir = lat >= 0 ? 'N' : 'S';
+    const lonDir = lon >= 0 ? 'E' : 'W';
+    document.getElementById('coords-display').innerText = 
+        `LAT: ${Math.abs(lat)}° ${latDir} | LON: ${Math.abs(lon)}° ${lonDir}`;
 });
 
-// 2. Alternar Camadas Base (Viking vs MOLA)
+// 2. Alternância entre Órbita Global e Setor Local (Candor Chasma)
+const btnGlobal = document.getElementById('btn-view-global');
+const btnLocal = document.getElementById('btn-view-local');
+
+function setActiveScaleButton(mode) {
+    if (mode === 'global') {
+        btnGlobal.className = "px-3 py-1.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold transition";
+        btnLocal.className = "px-3 py-1.5 rounded text-slate-400 hover:text-white transition";
+    } else {
+        btnLocal.className = "px-3 py-1.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold transition";
+        btnGlobal.className = "px-3 py-1.5 rounded text-slate-400 hover:text-white transition";
+    }
+}
+
+btnGlobal.addEventListener('click', () => {
+    map.flyTo(VIEWS.global.center, VIEWS.global.zoom, { duration: 1.2 });
+    setActiveScaleButton('global');
+});
+
+btnLocal.addEventListener('click', () => {
+    map.flyTo(VIEWS.local.center, VIEWS.local.zoom, { duration: 1.2 });
+    setActiveScaleButton('local');
+});
+
+// 3. Troca de Mosaicos Base (THEMIS, Viking, MOLA) mantendo rotas intactas
+let currentBaseLayer = nasaLayers.themis;
+
 document.querySelectorAll('input[name="baseLayer"]').forEach((radio) => {
     radio.addEventListener('change', (e) => {
-        if (e.target.value === 'viking') {
-            map.removeLayer(nasaLayers.mola);
-            map.addLayer(nasaLayers.viking);
-        } else {
-            map.removeLayer(nasaLayers.viking);
-            map.addLayer(nasaLayers.mola);
-        }
+        map.removeLayer(currentBaseLayer);
+        currentBaseLayer = nasaLayers[e.target.value];
+        map.addLayer(currentBaseLayer);
+        currentBaseLayer.bringToBack();
     });
 });
 
-// 3. Adicionar Pontos Científicos (Waypoints)
-const waypointsGroup = L.layerGroup().addTo(map);
-
-marsWaypoints.forEach((pt) => {
-    const marker = L.circleMarker([pt.lat, pt.lon], {
-        radius: 8,
-        fillColor: pt.risk === "Alto" ? "#ef4444" : "#f97316",
-        color: "#ffffff",
-        weight: 2,
-        fillOpacity: 0.9
-    });
-
-    marker.bindPopup(`
-        <div class="font-sans">
-            <span class="text-[10px] uppercase font-bold text-orange-400">${pt.type}</span>
-            <h3 class="font-bold text-sm mt-0.5">${pt.name}</h3>
-            <p class="text-xs text-slate-300 mt-1">${pt.science}</p>
-            <div class="text-[11px] mt-2 font-mono text-slate-400">Risco de Terreno: <strong class="text-white">${pt.risk}</strong></div>
-        </div>
-    `);
-
-    marker.addTo(waypointsGroup);
-});
-
-// Toggle de visibilidade dos pontos científicos
-document.getElementById('toggle-waypoints').addEventListener('change', (e) => {
+// Toggle da camada de relevo sombreado (Hillshade)
+document.getElementById('toggle-hillshade').addEventListener('change', (e) => {
     if (e.target.checked) {
-        map.addLayer(waypointsGroup);
+        map.addLayer(nasaLayers.hillshade);
     } else {
-        map.removeLayer(waypointsGroup);
+        map.removeLayer(nasaLayers.hillshade);
     }
 });
 
-// 4. Planejador de Rota EVA (Clique em A e B)
+// 4. Planejador de Rota EVA (Sobreposto a qualquer camada/escala)
 let routePoints = [];
 let routeLine = null;
 let routeMarkers = [];
@@ -69,7 +83,15 @@ map.on('click', (e) => {
     }
 
     routePoints.push(e.latlng);
-    const marker = L.marker(e.latlng).addTo(map);
+    const marker = L.circleMarker(e.latlng, {
+        pane: 'missionOverlayPane',
+        radius: 6,
+        fillColor: '#38bdf8',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(map);
+    
     routeMarkers.push(marker);
 
     if (routePoints.length === 2) {
@@ -79,30 +101,28 @@ map.on('click', (e) => {
 
 function drawRouteAndCalculate() {
     routeLine = L.polyline(routePoints, {
+        pane: 'missionOverlayPane',
         color: '#38bdf8',
         weight: 3,
         dashArray: '6, 8'
     }).addTo(map);
 
-    // Cálculo proporcional para o raio de Marte (aprox. 53% do raio da Terra)
+    // Distância corrigida para o raio de Marte (0.532x raio da Terra)
     const earthDistanceMeters = routePoints[0].distanceTo(routePoints[1]);
     const marsDistanceKm = (earthDistanceMeters * 0.532) / 1000;
 
-    // Simulação simples de gasto de O2 (ex: 4% por km caminhado)
-    const o2Used = Math.min(100, Math.round(marsDistanceKm * 4.2));
+    // Consumo base estimado de O2 em terreno plano
+    const o2Used = Math.min(100, Math.round(marsDistanceKm * 4.5));
 
     document.getElementById('route-distance').innerText = `${marsDistanceKm.toFixed(2)} km`;
     document.getElementById('route-o2').innerText = `${o2Used}%`;
 
     const statusEl = document.getElementById('route-status');
-    if (o2Used > 75) {
-        statusEl.innerText = "CRÍTICO (EXCEDE O₂)";
+    if (o2Used > 80) {
+        statusEl.innerText = "EXCEDE AUTONOMIA";
         statusEl.className = "text-red-500 font-bold";
-    } else if (o2Used > 40) {
-        statusEl.innerText = "ALERTA MODERADO";
-        statusEl.className = "text-amber-400 font-bold";
     } else {
-        statusEl.innerText = "SEGURO PARA EVA";
+        statusEl.innerText = "ROTA TRAÇADA";
         statusEl.className = "text-emerald-400 font-bold";
     }
 }
@@ -115,7 +135,7 @@ function clearRoute() {
     document.getElementById('route-distance').innerText = "0.00 km";
     document.getElementById('route-o2').innerText = "0%";
     const statusEl = document.getElementById('route-status');
-    statusEl.innerText = "AGUARDANDO ROTA";
+    statusEl.innerText = "AGUARDANDO PONTOS";
     statusEl.className = "text-slate-500";
 }
 
