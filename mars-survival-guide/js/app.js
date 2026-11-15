@@ -326,7 +326,7 @@ function identificarSetorMarte(lat, lon) {
 }
 
 // ============================================================================
-// 5. ALGORITMO A* (PATHFINDING OTIMIZADO PELO RELEVO E GEOLOGIA)
+// 5. ALGORITMO A* REALISTA (RESPEITA PAREDES DO CÂNION 'VW' E RELEVO MOLA)
 // ============================================================================
 function isPointInRing(latlng, ring) {
     let inside = false;
@@ -348,19 +348,41 @@ function isPointInPolygon(latlng, polyLayer) {
 }
 
 function consultarGeologiaNoPonto(latlng) {
+    // Prioriza unidades internas do cânion (vw, vf, vl, ch, vs) sobre o planalto geral
+    let unidadeEncontrada = null;
     for (let i = 0; i < geologyLayersList.length; i++) {
         if (isPointInPolygon(latlng, geologyLayersList[i].layer)) {
-            return geologyLayersList[i].properties;
+            const prop = geologyLayersList[i].properties;
+            const code = prop.code.toLowerCase();
+            if (code === "vw") return prop; // Parede escarpada tem prioridade máxima de detecção
+            unidadeEncontrada = prop;
         }
     }
-    return null;
+    return unidadeEncontrada;
 }
 
-// Calcula a melhor rota curva (A*) evitando subidas íngremes e paredes do cânion (VW)
+// Elevação calibrada com a unidade geológica real + relevo MOLA
+function getElevacaoRealista(latlng, geoProp) {
+    const baseMola = getMarsElevationMOLA(latlng.lat, latlng.lng);
+    if (!geoProp) return baseMola;
+
+    const code = geoProp.code.toLowerCase();
+    // Fundo do cânion (VF, VL, CH) fica entre -4.300m e -3.400m
+    if (code === "vf" || code === "ch") return Math.min(baseMola, -3950);
+    if (code === "vl") return Math.min(baseMola, -3450);
+    if (code === "vs") return -3100;
+    // Paredes escarpadas (VW) sobem abruptamente até +1.200m
+    if (code === "vw") return 450;
+    // Planalto superior (PC, P, PR) fica acima de +1.400m
+    if (code === "pc" || code === "p" || code === "pr") return Math.max(baseMola, 1450);
+    return baseMola;
+}
+
+// Calcula a melhor rota EVA respeitando o fundo do cânion e bloqueando travessias de penhascos
 function calcularMelhorRotaAStar(inicioLatLng, fimLatLng) {
-    const GRID_SIZE = 24; // Grade 24x24 de alta resolução entre origem e destino
-    const padLat = Math.max(0.18, Math.abs(fimLatLng.lat - inicioLatLng.lat) * 0.45);
-    const padLng = Math.max(0.18, Math.abs(fimLatLng.lng - inicioLatLng.lng) * 0.45);
+    const GRID_SIZE = 28; // Grade fina para contornar paredes internas (Candor Mensa / escarpas)
+    const padLat = Math.max(0.15, Math.abs(fimLatLng.lat - inicioLatLng.lat) * 0.45);
+    const padLng = Math.max(0.15, Math.abs(fimLatLng.lng - inicioLatLng.lng) * 0.45);
 
     const minLat = Math.min(inicioLatLng.lat, fimLatLng.lat) - padLat;
     const maxLat = Math.max(inicioLatLng.lat, fimLatLng.lat) + padLat;
@@ -380,13 +402,21 @@ function calcularMelhorRotaAStar(inicioLatLng, fimLatLng) {
     const startNode = toGrid(inicioLatLng);
     const goalNode = toGrid(fimLatLng);
 
-    // Pré-calcula altitude e custo geológico de cada nó da grade
-    const elevGrid = Array.from({ length: GRID_SIZE + 1 }, (_, r) =>
+    // Mapeia geologia e elevação realista de cada célula da grade
+    const gridData = Array.from({ length: GRID_SIZE + 1 }, (_, r) =>
         Array.from({ length: GRID_SIZE + 1 }, (_, c) => {
             const pt = toLatLng(r, c);
-            return getMarsElevationMOLA(pt.lat, pt.lng);
+            const geo = consultarGeologiaNoPonto(pt);
+            const elev = getElevacaoRealista(pt, geo);
+            const code = geo ? geo.code.toLowerCase() : "";
+            const isWall = code === "vw";
+            const isPlateau = (code === "pc" || code === "p" || code === "pr");
+            return { pt, geo, elev, isWall, isPlateau };
         })
     );
+
+    const startInCanyon = !gridData[startNode.r][startNode.c].isPlateau;
+    const goalInCanyon = !gridData[goalNode.r][goalNode.c].isPlateau;
 
     const key = (r, c) => `${r},${c}`;
     const openSet = [{ r: startNode.r, c: startNode.c, f: 0 }];
@@ -399,13 +429,12 @@ function calcularMelhorRotaAStar(inicioLatLng, fimLatLng) {
     ];
 
     let iter = 0;
-    while (openSet.length > 0 && iter < 3000) {
+    while (openSet.length > 0 && iter < 4500) {
         iter++;
         openSet.sort((a, b) => a.f - b.f);
         const current = openSet.shift();
 
         if (current.r === goalNode.r && current.c === goalNode.c) {
-            // Reconstrói o caminho ótimo
             const path = [fimLatLng];
             let currKey = key(current.r, current.c);
             while (cameFrom[currKey]) {
@@ -416,29 +445,37 @@ function calcularMelhorRotaAStar(inicioLatLng, fimLatLng) {
                 currKey = key(prev.r, prev.c);
             }
             path.unshift(inicioLatLng);
-            return path;
+            return { waypoints: path, bloqueadaPorParede: false };
         }
 
-        const currPt = toLatLng(current.r, current.c);
-        const currElev = elevGrid[current.r][current.c];
+        const currCell = gridData[current.r][current.c];
 
         for (const [dr, dc] of dirs) {
             const nr = current.r + dr;
             const nc = current.c + dc;
             if (nr < 0 || nr > GRID_SIZE || nc < 0 || nc > GRID_SIZE) continue;
 
-            const nextPt = toLatLng(nr, nc);
-            const nextElev = elevGrid[nr][nc];
-            const distKm = distanciaMarteKm(currPt, nextPt);
+            const nextCell = gridData[nr][nc];
+            const isGoal = (nr === goalNode.r && nc === goalNode.c);
+
+            // BLOQUEIO FÍSICO REALISTA PARA CAMINHADA ESPACIAL (EVA):
+            // 1. Não atravessa paredes escarpadas do cânion ('VW')
+            if (nextCell.isWall && !isGoal) continue;
+            // 2. Se a caminhada começou dentro do cânion, não deixa "pular" o penhasco de 5km para o planalto
+            if (startInCanyon && nextCell.isPlateau && !isGoal) continue;
+            if (!startInCanyon && !nextCell.isPlateau && !isGoal) continue;
+
+            const distKm = distanciaMarteKm(currCell.pt, nextCell.pt);
             const distMeters = Math.max(10, distKm * 1000);
-            const deltaH = nextElev - currElev;
+            const deltaH = nextCell.elev - currCell.elev;
             const slopeDeg = Math.atan(Math.abs(deltaH) / distMeters) * (180 / Math.PI);
 
-            // Custo físico: distância + penalidade severa para subidas e encostas > 12°
+            // Astronauta em traje EVA não escala encostas acima de 20°
+            if (slopeDeg > 20 && !isGoal) continue;
+
             let stepCost = distKm;
-            if (deltaH > 0) stepCost += (deltaH / 100) * 1.8; // Subir consome muito mais energia
-            if (slopeDeg > 12) stepCost += Math.pow(slopeDeg - 12, 2) * 0.5;
-            if (slopeDeg > 22) stepCost += 500; // Barreira quase intransponível
+            if (deltaH > 0) stepCost += (deltaH / 100) * 2.2;
+            if (slopeDeg > 10) stepCost += Math.pow(slopeDeg - 10, 2) * 0.6;
 
             const tentativeG = gScore[key(current.r, current.c)] + stepCost;
             const nKey = key(nr, nc);
@@ -446,23 +483,32 @@ function calcularMelhorRotaAStar(inicioLatLng, fimLatLng) {
             if (tentativeG < (gScore[nKey] ?? Infinity)) {
                 cameFrom[nKey] = current;
                 gScore[nKey] = tentativeG;
-                const h = distanciaMarteKm(nextPt, fimLatLng);
+                const h = distanciaMarteKm(nextCell.pt, fimLatLng);
                 openSet.push({ r: nr, c: nc, f: tentativeG + h });
             }
         }
     }
 
-    return [inicioLatLng, fimLatLng]; // Fallback caso não haja caminho alternativo
+    // Se chegou aqui, não existe passagem segura sem escalar um penhasco vertical de Valles Marineris
+    return {
+        waypoints: [inicioLatLng, fimLatLng],
+        bloqueadaPorParede: true,
+        motivoBloqueio: startInCanyon !== goalInCanyon
+            ? "TRANSPOSIÇÃO DE PAREDE (5.000m) IMPOSSÍVEL EM EVA"
+            : "ESCARPA ÍNGREME (VW) BLOQUEANDO O VALE"
+    };
 }
 
-// Calcula toda a física e telemetria de uma trajetória curva (array de LatLng)
-function analisarTrajetoriaCompleta(waypoints) {
+function analisarTrajetoriaCompleta(resultadoRota) {
+    const waypoints = resultadoRota.waypoints;
     let distanciaTotalKm = 0;
     let subidaAcumuladaM = 0;
-    let descidaAcumuladaM = 0;
     let inclinacaoMaximaDeg = 0;
 
-    const altInicial = getMarsElevationMOLA(waypoints[0].lat, waypoints[0].lng);
+    const geoInicio = consultarGeologiaNoPonto(waypoints[0]);
+    const geoFim = consultarGeologiaNoPonto(waypoints[waypoints.length - 1]);
+
+    const altInicial = getElevacaoRealista(waypoints[0], geoInicio);
     let altFinal = altInicial;
 
     for (let i = 0; i < waypoints.length - 1; i++) {
@@ -471,18 +517,15 @@ function analisarTrajetoriaCompleta(waypoints) {
         const segKm = distanciaMarteKm(pA, pB);
         distanciaTotalKm += segKm;
 
-        // Sub-amostragem de cada segmento para precisão topográfica
         const subSteps = 4;
-        let prevAlt = getMarsElevationMOLA(pA.lat, pA.lng);
+        let prevAlt = getElevacaoRealista(pA, consultarGeologiaNoPonto(pA));
         for (let s = 1; s <= subSteps; s++) {
             const t = s / subSteps;
-            const sLat = pA.lat + (pB.lat - pA.lat) * t;
-            const sLng = pA.lng + (pB.lng - pA.lng) * t;
-            const currAlt = getMarsElevationMOLA(sLat, sLng);
+            const sPt = L.latLng(pA.lat + (pB.lat - pA.lat) * t, pA.lng + (pB.lng - pA.lng) * t);
+            const currAlt = getElevacaoRealista(sPt, consultarGeologiaNoPonto(sPt));
             const dH = currAlt - prevAlt;
 
             if (dH > 0) subidaAcumuladaM += dH;
-            else descidaAcumuladaM += Math.abs(dH);
 
             const segMeters = (segKm * 1000) / subSteps;
             if (segMeters > 0) {
@@ -495,23 +538,16 @@ function analisarTrajetoriaCompleta(waypoints) {
     }
 
     const variacaoLiquidaM = altFinal - altInicial;
-
-    // Física Marciana (g = 3.72 m/s²):
-    // Rover Pressurizado (~1.800 kg): 0.42 kWh/km plano + energia potencial gravitacional (m * g * h / 3.6e6) / eficiência (0.75)
     const energiaPlanoKwh = distanciaTotalKm * 0.42;
     const energiaSubidaKwh = (1800 * 3.72 * subidaAcumuladaM) / (3600000 * 0.75);
     const gastoEnergeticoKwh = energiaPlanoKwh + energiaSubidaKwh;
 
-    // Consumo de O2 da tripulação (2 astronautas em Rover / EVA): ~32g/km + 0.22g/m subida
     const consumoO2Gramas = Math.round((distanciaTotalKm * 32) + (subidaAcumuladaM * 0.22));
-    const tanqueO2Max = 1200; // Reserva combinada Rover + Mochilas xEMU (g)
+    const tanqueO2Max = 1200;
     const consumoO2Pct = Math.min(100, Math.round((consumoO2Gramas / tanqueO2Max) * 100));
 
-    // Velocidade média de cruzeiro reduzida pela inclinação
     const velMediaKmh = Math.max(6, 16 - (inclinacaoMaximaDeg * 0.4));
     const tempoHoras = distanciaTotalKm / velMediaKmh;
-
-    const destinoGeo = consultarGeologiaNoPonto(waypoints[waypoints.length - 1]);
 
     return {
         distanciaKm: distanciaTotalKm,
@@ -520,10 +556,11 @@ function analisarTrajetoriaCompleta(waypoints) {
         inclinacaoMaximaDeg,
         gastoEnergeticoKwh,
         consumoO2Gramas,
-        tanqueO2Max,
         consumoO2Pct,
         tempoHoras,
-        destinoGeo
+        destinoGeo: geoFim,
+        bloqueadaPorParede: resultadoRota.bloqueadaPorParede,
+        motivoBloqueio: resultadoRota.motivoBloqueio
     };
 }
 
@@ -535,19 +572,33 @@ function atualizarPainelTelemetria(stats) {
     const elRes = document.getElementById('route-resource');
     const elYield = document.getElementById('route-yield');
 
-    if (elDist) elDist.innerText = `${stats.distanciaKm.toFixed(2)} km (~${stats.tempoHoras.toFixed(1)}h)`;
-    if (elElev) {
-        const sign = stats.variacaoLiquidaM >= 0 ? '+' : '';
-        elElev.innerText = `${sign}${stats.variacaoLiquidaM} m (Subida: ${stats.subidaAcumuladaM}m)`;
+    if (stats.bloqueadaPorParede) {
+        if (elDist) elDist.innerText = "ROTA INVIÁVEL (PAREDE)";
+        if (elElev) elElev.innerText = `${stats.variacaoLiquidaM >= 0 ? '+' : ''}${stats.variacaoLiquidaM} m (Abismo!)`;
+        if (elSlope) {
+            elSlope.innerText = `${stats.inclinacaoMaximaDeg.toFixed(1)}° (BLOQUEADO)`;
+            elSlope.className = "text-red-500 font-bold";
+        }
+        if (elO2) {
+            elO2.innerText = stats.motivoBloqueio || "ESCARPA INTRANSPONÍVEL";
+            elO2.className = "text-red-400 font-bold text-[10px]";
+        }
+    } else {
+        if (elDist) elDist.innerText = `${stats.distanciaKm.toFixed(2)} km (~${stats.tempoHoras.toFixed(1)}h)`;
+        if (elElev) {
+            const sign = stats.variacaoLiquidaM >= 0 ? '+' : '';
+            elElev.innerText = `${sign}${stats.variacaoLiquidaM} m (Subida: ${stats.subidaAcumuladaM}m)`;
+        }
+        if (elSlope) {
+            elSlope.innerText = `${stats.inclinacaoMaximaDeg.toFixed(1)}° ${stats.inclinacaoMaximaDeg > 18 ? '(ÍNGREME!)' : '(SEGURO)'}`;
+            elSlope.className = stats.inclinacaoMaximaDeg > 18 ? "text-red-400 font-bold" : "text-emerald-400 font-bold";
+        }
+        if (elO2) {
+            elO2.innerText = `${stats.consumoO2Gramas}g O₂ | ${stats.gastoEnergeticoKwh.toFixed(1)} kWh`;
+            elO2.className = stats.consumoO2Pct > 85 ? "text-red-500 font-bold" : "text-cyan-400 font-bold";
+        }
     }
-    if (elSlope) {
-        elSlope.innerText = `${stats.inclinacaoMaximaDeg.toFixed(1)}° ${stats.inclinacaoMaximaDeg > 18 ? '(ÍNGREME!)' : '(SEGURO)'}`;
-        elSlope.className = stats.inclinacaoMaximaDeg > 18 ? "text-red-400 font-bold" : "text-emerald-400 font-bold";
-    }
-    if (elO2) {
-        elO2.innerText = `${stats.consumoO2Gramas}g O₂ | ${stats.gastoEnergeticoKwh.toFixed(1)} kWh`;
-        elO2.className = stats.consumoO2Pct > 85 ? "text-red-500 font-bold" : "text-cyan-400 font-bold";
-    }
+
     if (elRes && elYield) {
         if (stats.destinoGeo) {
             elRes.innerText = `[${stats.destinoGeo.code}] ${stats.destinoGeo.name.split('(')[0].trim()}`;
@@ -583,7 +634,6 @@ function calcularPontoPousoEAlvo(candorData) {
         if (u === "vf" || u === "p" || u === "pc") {
             zonasPousoSeguro.push({ uName: u, latlng: centroLatLng, prioridade: u === "vf" ? 1 : 2 });
         }
-        // Prioriza apenas materiais com fortes indícios de água ('ch' = canais fluviais, 'vl' = camadas hidratadas)
         if (u === "ch" || u === "vl") {
             alvosHidricos.push({ uName: u, latlng: centroLatLng, prioridade: u === "ch" ? 1 : 2 });
         }
@@ -618,6 +668,27 @@ function calcularPontoPousoEAlvo(candorData) {
 }
 
 let missaoAtivaStats = null;
+let missaoRotaWaypoints = [];
+
+// Função para abrir a explicação de qualquer unidade clicada na tabela
+function mostrarExplicacaoUnidade(uName) {
+    const info = geologyCatalog[uName];
+    const box = document.getElementById('unit-detail-box');
+    if (!info || !box) return;
+
+    document.getElementById('unit-detail-title').innerText = `[${info.code}] ${info.name}`;
+    document.getElementById('unit-detail-mineral').innerText = `Mineral: ${info.mineral} (~${info.waterYieldLitersPerTon} L/t)`;
+    document.getElementById('unit-detail-desc').innerText = info.desc;
+    document.getElementById('unit-detail-extract').innerText = `Operação ISRU: ${info.extractionMethod}`;
+    box.classList.remove('hidden');
+}
+
+const closeUnitBtn = document.getElementById('close-unit-detail');
+if (closeUnitBtn) {
+    closeUnitBtn.addEventListener('click', () => {
+        document.getElementById('unit-detail-box').classList.add('hidden');
+    });
+}
 
 fetch('data/candor_chemistry.geojson')
     .then(response => {
@@ -664,29 +735,37 @@ fetch('data/candor_chemistry.geojson')
             return false;
         });
 
-        // Preenche imediatamente a Tabela de Cores na Barra Lateral
+        // Preenche a Tabela Clicável de Cores na Barra Lateral
         const legendBody = document.getElementById('hydro-legend-body');
         if (legendBody) {
             let htmlTabela = "";
             unidadesEncontradas.forEach(uName => {
                 const info = geologyCatalog[uName];
                 htmlTabela += `
-                    <div class="flex items-center justify-between text-xs py-1.5">
+                    <button type="button" data-unit="${uName}" class="unit-row-btn w-full flex items-center justify-between text-xs py-1.5 px-1.5 rounded hover:bg-slate-800/90 transition text-left cursor-pointer">
                         <div class="flex items-center gap-2 truncate pr-2">
                             <span class="w-3.5 h-3.5 rounded-sm shrink-0 border border-white/40" style="background:${info.color}"></span>
                             <span class="font-['JetBrains_Mono'] font-bold text-slate-200">${info.code}</span>
                             <span class="text-slate-300 truncate">${info.name.split('(')[0].trim()}</span>
                         </div>
                         <span class="font-['JetBrains_Mono'] text-cyan-300 font-bold shrink-0">${info.waterYieldLitersPerTon} L/t</span>
-                    </div>
+                    </button>
                 `;
             });
             legendBody.innerHTML = htmlTabela || `<div class="text-xs text-slate-400 py-2">Nenhuma unidade neste raio.</div>`;
+
+            // Ativa o clique em cada caixinha da tabela
+            legendBody.querySelectorAll('.unit-row-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    mostrarExplicacaoUnidade(btn.getAttribute('data-unit'));
+                });
+            });
         }
 
         const geoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: featuresFiltradas400km }, {
             pane: 'geologyPane',
             coordsToLatLng: geoCoordsToLatLng,
+            interactive: false, // Deixa o clique no mapa livre para inspeção limpa de qualquer ponto
             style: (feature) => {
                 const rawUnit = feature.properties.UName || feature.properties.uname || feature.properties.UNIT;
                 const uName = String(rawUnit).trim().toLowerCase();
@@ -707,96 +786,152 @@ fetch('data/candor_chemistry.geojson')
                 const rawUnit = feature.properties.UName || feature.properties.uname || feature.properties.UNIT;
                 const uName = String(rawUnit).trim().toLowerCase();
                 const p = geologyCatalog[uName];
-                if (!p) return;
-
-                layer.bindPopup(`
-                    <div class="font-sans max-w-xs">
-                        <div class="flex items-center gap-2">
-                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded text-white" style="background:${p.color}">${p.code}</span>
-                            <span class="text-[10px] uppercase font-bold text-slate-400">${p.mission}</span>
-                        </div>
-                        <h3 class="font-bold text-sm mt-1">${p.name}</h3>
-                        <div class="text-xs text-slate-300 mt-1"><strong>Mineralogia:</strong> ${p.mineral}</div>
-                        <div class="text-xs text-cyan-300 font-mono mt-1">Rendimento H₂O: ~${p.waterYieldLitersPerTon} L/ton</div>
-                        <div class="text-[11px] text-slate-400 mt-1"><strong>Extração:</strong> ${p.extractionMethod}</div>
-                        <p class="text-[11px] text-slate-300 mt-1.5 border-t border-slate-700 pt-1">${p.desc}</p>
-                    </div>
-                `);
-
-                geologyLayersList.push({ properties: p, layer: layer });
+                if (p) geologyLayersList.push({ properties: p, layer: layer });
             }
         });
 
         geoJsonLayer.addTo(geologyGroup);
 
-        // Calcula a MELHOR ROTA CURVA (A*) da Base de Pouso até o Alvo Hídrico
-        const rotaOtimizada = calcularMelhorRotaAStar(missao.pousoLatLng, missao.alvoLatLng);
-        missaoAtivaStats = analisarTrajetoriaCompleta(rotaOtimizada);
+        // Calcula a rota realista A* pelo fundo do cânion
+        const resultadoRota = calcularMelhorRotaAStar(missao.pousoLatLng, missao.alvoLatLng);
+        missaoRotaWaypoints = resultadoRota.waypoints;
+        missaoAtivaStats = analisarTrajetoriaCompleta(resultadoRota);
 
         const pousoInfo = geologyCatalog[missao.pousoUnit];
         const alvoInfo = geologyCatalog[missao.alvoUnit];
 
-        const elLanding = document.getElementById('mission-landing-unit');
-        const elTarget = document.getElementById('mission-target-unit');
-        const elDist = document.getElementById('mission-target-dist');
+        // Preenche o Card Principal da Missão Tripulada Ativa com toda a Telemetria Oficial
+        document.getElementById('mission-landing-unit').innerText = `${missao.setor} (${pousoInfo.code})`;
+        document.getElementById('mission-target-unit').innerText = `${alvoInfo.name.split('(')[0].trim()} (${alvoInfo.code})`;
+        document.getElementById('mission-target-dist').innerText = `${missaoAtivaStats.distanciaKm.toFixed(2)} km (~${missaoAtivaStats.tempoHoras.toFixed(1)}h)`;
+        
+        const sign = missaoAtivaStats.variacaoLiquidaM >= 0 ? '+' : '';
+        document.getElementById('mission-elev').innerText = `${sign}${missaoAtivaStats.variacaoLiquidaM} m (Subida: ${missaoAtivaStats.subidaAcumuladaM}m)`;
+        document.getElementById('mission-slope').innerText = `${missaoAtivaStats.inclinacaoMaximaDeg.toFixed(1)}° (SEGURO)`;
+        document.getElementById('mission-energy').innerText = `${missaoAtivaStats.consumoO2Gramas}g O₂ | ${missaoAtivaStats.gastoEnergeticoKwh.toFixed(1)} kWh`;
 
-        if (elLanding) elLanding.innerText = `${missao.setor} (${pousoInfo.code})`;
-        if (elTarget) elTarget.innerText = `${alvoInfo.name.split('(')[0].trim()} (${alvoInfo.code})`;
-        if (elDist) elDist.innerText = `${missaoAtivaStats.distanciaKm.toFixed(2)} km (Rota A*)`;
+        // Preenche a Justificativa Científica (APENAS Pouso e Destino) no ícone Diagnóstico
+        const pousoAltM = getElevacaoRealista(missao.pousoLatLng, pousoInfo);
+        const diagLandingEl = document.getElementById('diag-landing-text');
+        const diagWaterEl = document.getElementById('diag-water-text');
 
-        // Preenche a Telemetria com os dados da Missão Ativa
-        atualizarPainelTelemetria(missaoAtivaStats);
+        if (diagLandingEl) {
+            diagLandingEl.innerHTML = `<b>${missao.setor} — Unidade ${pousoInfo.code} (${pousoInfo.name.split('(')[0].trim()})</b>: Planície sedimentar plana no fundo do vale a <b>${pousoAltM.toLocaleString('pt-BR')} m</b> de altitude. A baixa elevação aumenta a coluna atmosférica acima da nave, otimizando a frenagem aerodinâmica (EDL), reduzindo a radiação cósmica e mantendo distância segura das escarpas verticais (<b>VW</b>).`;
+        }
+        if (diagWaterEl) {
+            diagWaterEl.innerHTML = `<b>${alvoInfo.name} (${alvoInfo.code})</b>: Escolhido pela presença de <b>${alvoInfo.mineral}</b>. Na carta geológica de Coprates (McCauley, 1978), representa depósitos estratificados no interior do cânion, com rendimento estimado de <b>~${alvoInfo.waterYieldLitersPerTon} litros de H₂O/ton</b> via ${alvoInfo.extractionMethod.toLowerCase()}.`;
+        }
 
-        // Base de Pouso (Vermelho)
-        L.circleMarker(missao.pousoLatLng, {
-            pane: 'missionOverlayPane',
-            radius: 10, fillColor: "#ef4444", color: "#ffffff", weight: 2.5, fillOpacity: 1
-        }).bindPopup(`
-            <div class="font-sans">
-                <span class="text-[10px] uppercase font-bold text-emerald-400">LOCAL CONFIRMADO: ${missao.setor.toUpperCase()}</span>
-                <h3 class="font-bold text-sm mt-0.5">Base de Pouso (${pousoInfo.code})</h3>
-                <div class="text-xs font-mono text-slate-300 mt-1">Alt: ${getMarsElevationMOLA(missao.pousoLatLng.lat, missao.pousoLatLng.lng)} m (Fundo Plano)</div>
-                <p class="text-xs text-slate-300 mt-1">Rota otimizada até o alvo hídrico: <b>${missaoAtivaStats.distanciaKm.toFixed(2)} km</b> (${missaoAtivaStats.gastoEnergeticoKwh.toFixed(1)} kWh).</p>
-            </div>
-        `).addTo(targetsGroup);
-
-        // Alvo Hídrico (Ciano)
-        L.circleMarker(missao.alvoLatLng, {
-            pane: 'missionOverlayPane',
-            radius: 8, fillColor: "#06b6d4", color: "#ffffff", weight: 2, fillOpacity: 1
-        }).bindPopup(`
-            <div class="font-sans">
-                <span class="text-[10px] uppercase font-bold text-cyan-400">ALVO HÍDRICO — ${missao.setor.toUpperCase()}</span>
-                <h3 class="font-bold text-sm mt-0.5">${alvoInfo.name}</h3>
-                <div class="text-xs text-slate-300 mt-1"><strong>Indícios H₂O:</strong> ${alvoInfo.mineral}</div>
-                <p class="text-xs text-cyan-300 font-mono mt-1">Rendimento: <b>${alvoInfo.waterYieldLitersPerTon} L/ton</b></p>
-            </div>
-        `).addTo(targetsGroup);
-
-        // Desenha a ROTA OTIMIZADA CURVA (A*) em amarelo brilhante
-        L.polyline(rotaOtimizada, {
+        // Desenha a rota oficial A*
+        L.polyline(resultadoRota.waypoints, {
             pane: 'missionOverlayPane',
             color: "#facc15",
             weight: 3.5,
-            smoothFactor: 1.5
+            smoothFactor: 1.5,
+            interactive: false
         }).addTo(targetsGroup);
+
+        // Base de Pouso (Vermelho)
+        const baseMarker = L.circleMarker(missao.pousoLatLng, {
+            pane: 'missionOverlayPane',
+            radius: 11, fillColor: "#ef4444", color: "#ffffff", weight: 3, fillOpacity: 1
+        }).bindPopup(`
+            <div class="font-sans max-w-xs">
+                <span class="text-[10px] uppercase font-bold text-red-400">BASE DE POUSO HUMANA // ${missao.setor.toUpperCase()}</span>
+                <h3 class="font-bold text-sm mt-0.5">${pousoInfo.name}</h3>
+                <div class="text-xs font-mono text-cyan-300 mt-1">Lat: ${missao.pousoLatLng.lat.toFixed(3)}° | Lon: ${missao.pousoLatLng.lng.toFixed(3)}° | Alt: ${pousoAltM} m</div>
+                <p class="text-xs text-slate-300 mt-1.5">Terreno plano e seguro no interior de Candor Chasma. Distância de caminhada/rover até o alvo hídrico: <b>${missaoAtivaStats.distanciaKm.toFixed(2)} km</b>.</p>
+            </div>
+        `);
+        baseMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); baseMarker.openPopup(); });
+        baseMarker.addTo(targetsGroup);
+
+        // Alvo Hídrico (Ciano)
+        const alvoMarker = L.circleMarker(missao.alvoLatLng, {
+            pane: 'missionOverlayPane',
+            radius: 9, fillColor: "#06b6d4", color: "#ffffff", weight: 2.5, fillOpacity: 1
+        }).bindPopup(`
+            <div class="font-sans max-w-xs">
+                <span class="text-[10px] uppercase font-bold text-cyan-400">DESTINO HÍDRICO (ISRU) // ${missao.setor.toUpperCase()}</span>
+                <h3 class="font-bold text-sm mt-0.5">${alvoInfo.name}</h3>
+                <div class="text-xs font-mono text-cyan-300 mt-1">Lat: ${missao.alvoLatLng.lat.toFixed(3)}° | Lon: ${missao.alvoLatLng.lng.toFixed(3)}°</div>
+                <p class="text-xs text-slate-300 mt-1.5"><strong>Material:</strong> ${alvoInfo.mineral} (~${alvoInfo.waterYieldLitersPerTon} L/ton).</p>
+            </div>
+        `);
+        alvoMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); alvoMarker.openPopup(); });
+        alvoMarker.addTo(targetsGroup);
 
         map.flyTo(missao.pousoLatLng, 9, { duration: 1.2 });
     })
-    .catch(err => {
-        console.error("Erro no GeoJSON:", err);
-        const legendBody = document.getElementById('hydro-legend-body');
-        if (legendBody) legendBody.innerHTML = `<div class="text-xs text-red-400 py-2">Erro: ${err.message}</div>`;
-    });
+    .catch(err => console.error("Erro no GeoJSON:", err));
 
 // ============================================================================
-// 7. TELEMETRIA INTERATIVA (CLIQUE EM 2 PONTOS CALCULA MELHOR ROTA A*)
+// 7. INSPEÇÃO DE LOCAL (ESTILO POUSO) & SIMULADOR DE ROTA DE TESTE RETRÁTIL
 // ============================================================================
+let modoSimuladorRotaTeste = false;
 let routePoints = [];
 let routeLine = null;
 let routeMarkers = [];
 
+const toggleTestRouteBtn = document.getElementById('toggle-test-route-btn');
+const testRoutePanel = document.getElementById('test-route-panel');
+const testRouteBadge = document.getElementById('test-route-badge');
+
+if (toggleTestRouteBtn && testRoutePanel) {
+    toggleTestRouteBtn.addEventListener('click', () => {
+        modoSimuladorRotaTeste = !modoSimuladorRotaTeste;
+        if (modoSimuladorRotaTeste) {
+            testRoutePanel.classList.remove('hidden');
+            testRouteBadge.innerText = "ATIVO (CLIQUE 2 PTS)";
+            testRouteBadge.className = "text-[10px] font-['JetBrains_Mono'] text-cyan-300 font-bold";
+        } else {
+            testRoutePanel.classList.add('hidden');
+            testRouteBadge.innerText = "OCULTO";
+            testRouteBadge.className = "text-[10px] font-['JetBrains_Mono'] text-slate-400";
+            clearRoute();
+        }
+    });
+}
+
+// Calcula condições ambientais físicas a partir da altitude marciana
+function calcularAmbienteMarte(altitudeM) {
+    // Pressão barométrica marciana: P0 = 610 Pa a 0m, escala de altura H = 11.100m
+    const pressaoPa = Math.round(610 * Math.exp(-altitudeM / 11100));
+    // Temperatura média diurna no fundo do cânion (~ -20°C a -45°C conforme elevação)
+    const tempC = Math.round(-28 - (altitudeM / 1000) * 3.2);
+    return { pressaoPa, tempC };
+}
+
 map.on('click', (e) => {
+    // MODO 1 (Padrão): Clique esquerdo abre inspeção de local no exato estilo do popup de pouso
+    if (!modoSimuladorRotaTeste) {
+        const geo = consultarGeologiaNoPonto(e.latlng);
+        const altM = getElevacaoRealista(e.latlng, geo);
+        const setor = identificarSetorMarte(e.latlng.lat, e.latlng.lng);
+        const amb = calcularAmbienteMarte(altM);
+        const distBase = distanciaMarteKm(e.latlng, L.latLng(MISSION_CENTER.lat, MISSION_CENTER.lon)).toFixed(2);
+
+        const tituloUnidade = geo ? geo.name : "Platô Regolítico Não Mapeado";
+        const descricaoLocal = geo
+            ? `${geo.desc} Potencial hídrico estimado: <b>~${geo.waterYieldLitersPerTon} L/ton</b>. Distância da base: <b>${distBase} km</b>.`
+            : `Terreno basáltico externo fora das unidades catalogadas. Distância da base: <b>${distBase} km</b>.`;
+
+        L.popup()
+            .setLatLng(e.latlng)
+            .setContent(`
+                <div class="font-sans max-w-xs">
+                    <span class="text-[10px] uppercase font-bold text-amber-400">INSPEÇÃO DE TERRENO // ${setor.toUpperCase()}</span>
+                    <h3 class="font-bold text-sm mt-0.5 text-white">${tituloUnidade}</h3>
+                    <div class="text-xs font-mono text-cyan-300 mt-1">Lat: ${e.latlng.lat.toFixed(3)}° | Lon: ${e.latlng.lng.toFixed(3)}° | Alt: ${altM} m</div>
+                    <div class="text-[11px] font-mono text-emerald-300 mt-0.5">Pressão: ${amb.pressaoPa} Pa | Temp. Média: ${amb.tempC}°C</div>
+                    <p class="text-xs text-slate-300 mt-1.5 leading-relaxed">${descricaoLocal}</p>
+                </div>
+            `)
+            .openOn(map);
+        return;
+    }
+
+    // MODO 2 (Quando o Simulador de Rota de Teste está aberto): Traça rota A* entre 2 pontos
     if (routePoints.length >= 2) clearRoute();
 
     routePoints.push(e.latlng);
@@ -808,16 +943,26 @@ map.on('click', (e) => {
     routeMarkers.push(marker);
 
     if (routePoints.length === 2) {
-        const caminhoOtimizado = calcularMelhorRotaAStar(routePoints[0], routePoints[1]);
-        const stats = analisarTrajetoriaCompleta(caminhoOtimizado);
+        const resultadoRota = calcularMelhorRotaAStar(routePoints[0], routePoints[1]);
+        const stats = analisarTrajetoriaCompleta(resultadoRota);
 
-        const isDangerous = stats.inclinacaoMaximaDeg > 18 || stats.consumoO2Pct > 85;
-        routeLine = L.polyline(caminhoOtimizado, {
+        const isDangerous = stats.bloqueadaPorParede || stats.inclinacaoMaximaDeg > 18 || stats.consumoO2Pct > 85;
+        routeLine = L.polyline(resultadoRota.waypoints, {
             pane: 'missionOverlayPane',
             color: isDangerous ? '#ef4444' : '#38bdf8',
             weight: 3.5,
+            dashArray: stats.bloqueadaPorParede ? '6, 8' : null,
             smoothFactor: 1.5
         }).addTo(map);
+
+        if (stats.bloqueadaPorParede) {
+            routeLine.bindPopup(`
+                <div class="font-sans text-xs">
+                    <div class="font-bold text-red-400 uppercase">⚠ Travessia Bloqueada pelo Relevo</div>
+                    <p class="text-slate-300 mt-1">${stats.motivoBloqueio}. Não é possível atravessar paredes verticais de Valles Marineris em caminhada espacial.</p>
+                </div>
+            `).openPopup();
+        }
 
         atualizarPainelTelemetria(stats);
     }
@@ -829,13 +974,39 @@ function clearRoute() {
     routeMarkers.forEach(m => map.removeLayer(m));
     routeMarkers = [];
 
-    // Ao limpar a rota manual, restaura a telemetria da Missão Ativa
-    if (missaoAtivaStats) {
-        atualizarPainelTelemetria(missaoAtivaStats);
-    }
+    document.getElementById('route-distance').innerText = "0.00 km";
+    document.getElementById('route-elevation').innerText = "0 m";
+    document.getElementById('route-slope').innerText = "0.0°";
+    document.getElementById('route-slope').className = "text-slate-200 font-bold";
+    document.getElementById('route-o2').innerText = "0g O₂ | 0.0 kWh";
+    document.getElementById('route-o2').className = "text-cyan-400 font-bold";
+    document.getElementById('route-resource').innerText = "--";
+    document.getElementById('route-resource').className = "text-slate-500 text-right";
+    document.getElementById('route-yield').innerText = "0 L/ton";
 }
 
 const clearRouteBtn = document.getElementById('clear-route');
 if (clearRouteBtn) {
     clearRouteBtn.addEventListener('click', clearRoute);
+}
+
+// ============================================================================
+// 8. CONTROLE DO ÍCONE DISCRETO DE DIAGNÓSTICO CIENTÍFICO
+// ============================================================================
+const toggleDiagBtn = document.getElementById('toggle-diagnosis-btn');
+const closeDiagBtn = document.getElementById('close-diagnosis-btn');
+const diagCard = document.getElementById('mission-diagnosis-card');
+
+if (toggleDiagBtn && diagCard) {
+    toggleDiagBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        diagCard.classList.toggle('hidden');
+    });
+}
+
+if (closeDiagBtn && diagCard) {
+    closeDiagBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        diagCard.classList.add('hidden');
+    });
 }
