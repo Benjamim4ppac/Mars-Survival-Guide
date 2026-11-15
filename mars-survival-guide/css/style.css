@@ -1,28 +1,26 @@
-/* Fundo escuro para áreas sem tiles carregados */
-#mars-map {
-    background-color: #07090f;
-}
+/* Fontes locais (funcionam sem internet) */
+@font-face { font-family: 'Inter'; font-weight: 400; src: url('../vendor/fonts/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 600; src: url('../vendor/fonts/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 700; src: url('../vendor/fonts/inter-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url('../vendor/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 700; src: url('../vendor/fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'); }
 
-/* Efeito Espectral Orbital (CRISM/HEND): manchas suaves integradas ao relevo sem bordas duras */
-.leaflet-geologyPane-pane {
-    mix-blend-mode: screen;
-    opacity: 0.85;
-}
+/* Fundo escuro onde o mosaico não carregou */
+#mars-map { background-color: #07090f; }
 
-/* Controles de zoom em tema escuro */
+.leaflet-geologyPane-pane { mix-blend-mode: screen; opacity: 0.85; }
+
 .leaflet-control-zoom a {
     background-color: #0f172a !important;
     color: #e2e8f0 !important;
     border-color: #1e293b !important;
 }
+.leaflet-control-zoom a:hover { background-color: #1e293b !important; }
 
-.leaflet-control-zoom a:hover {
-    background-color: #1e293b !important;
-}
-
-/* Popups aeroespaciais */
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
     background-color: #0f172a;
     color: #f8fafc;
     border: 1px solid #334155;
 }
+
+button:focus-visible, input:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; }
