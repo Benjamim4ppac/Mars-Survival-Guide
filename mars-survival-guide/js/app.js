@@ -28,25 +28,24 @@ const targetsGroup = L.layerGroup().addTo(map);
 // 2. MODELO DIGITAL DE ELEVAÇÃO (DEM) MOLA E HUD SUPERIOR
 // ============================================================================
 function getMarsElevationMOLA(lat, lon) {
-    const canyonAxisLat = -6.0 + ((lon + 95.0) / 55.0) * -7.0;
+    // Eixo central real de Valles Marineris (de -6.5°S em -72°W até -13.5°S em -55°W)
+    const canyonAxisLat = -6.5 + ((lon + 72.0) / 22.0) * -6.5;
     const distFromAxis = Math.abs(lat - canyonAxisLat);
 
     let baseElevation;
-    if (distFromAxis < 1.2) {
-        baseElevation = -4350 + (distFromAxis * 350);
-    } else if (distFromAxis < 2.8) {
-        const wallProgress = (distFromAxis - 1.2) / 1.6;
-        baseElevation = -3930 + (wallProgress * 5400);
+    if (distFromAxis < 1.35) {
+        // Fundo profundo do cânion (-4.250 m a -3.600 m)
+        baseElevation = -4250 + (distFromAxis * 480);
+    } else if (distFromAxis < 2.6) {
+        // Paredes escarpadas do cânion
+        const wallProgress = (distFromAxis - 1.35) / 1.25;
+        baseElevation = -3600 + (wallProgress * 5100);
     } else {
-        baseElevation = 1470 + Math.sin(lon * 0.5) * 320;
+        // Planalto circundante (+1.500 m)
+        baseElevation = 1500 + Math.sin(lon * 0.5) * 280;
     }
 
-    const distCandorMensa = Math.hypot(lat - (-6.05), lon - (-70.90));
-    if (distCandorMensa < 0.65) {
-        baseElevation += (1 - distCandorMensa / 0.65) * 1650;
-    }
-
-    const microRelief = (Math.sin(lat * 18) * Math.cos(lon * 18)) * 120;
+    const microRelief = (Math.sin(lat * 22) * Math.cos(lon * 22)) * 140;
     return Math.round(baseElevation + microRelief);
 }
 
@@ -343,8 +342,19 @@ function isPointInRing(latlng, ring) {
 function isPointInPolygon(latlng, polyLayer) {
     const latlngs = polyLayer.getLatLngs();
     if (!latlngs || !latlngs.length) return false;
-    const polygons = Array.isArray(latlngs[0][0]) ? latlngs : [latlngs];
-    return polygons.some(poly => isPointInRing(latlng, poly[0]));
+
+    const checkPoly = (rings) => {
+        if (!Array.isArray(rings) || rings.length === 0) return false;
+        if (typeof rings[0].lat === 'number') {
+            return isPointInRing(latlng, rings);
+        }
+        if (Array.isArray(rings[0]) && rings[0].length > 0 && typeof rings[0][0].lat === 'number') {
+            return isPointInRing(latlng, rings[0]);
+        }
+        return rings.some(sub => checkPoly(sub));
+    };
+
+    return checkPoly(latlngs);
 }
 
 function consultarGeologiaNoPonto(latlng) {
@@ -361,20 +371,19 @@ function consultarGeologiaNoPonto(latlng) {
     return unidadeEncontrada;
 }
 
-// Elevação calibrada com a unidade geológica real + relevo MOLA
+// Elevação com micro-relevo natural preservado dentro do cânion
 function getElevacaoRealista(latlng, geoProp) {
     const baseMola = getMarsElevationMOLA(latlng.lat, latlng.lng);
+    const microOndulacao = Math.round((Math.sin(latlng.lat * 45) * Math.cos(latlng.lng * 45)) * 180);
     if (!geoProp) return baseMola;
 
     const code = geoProp.code.toLowerCase();
-    // Fundo do cânion (VF, VL, CH) fica entre -4.300m e -3.400m
-    if (code === "vf" || code === "ch") return Math.min(baseMola, -3950);
-    if (code === "vl") return Math.min(baseMola, -3450);
-    if (code === "vs") return -3100;
-    // Paredes escarpadas (VW) sobem abruptamente até +1.200m
-    if (code === "vw") return 450;
-    // Planalto superior (PC, P, PR) fica acima de +1.400m
-    if (code === "pc" || code === "p" || code === "pr") return Math.max(baseMola, 1450);
+    if (code === "ch") return -4250 + microOndulacao; // Canal mais profundo do vale (~900 Pa)
+    if (code === "vf") return -3950 + microOndulacao; // Fundo plano do cânion (~870 Pa)
+    if (code === "vl") return -3450 + microOndulacao; // Camadas lacustres elevadas (~830 Pa)
+    if (code === "vs") return -2900 + microOndulacao; // Depósitos de deslizamento na base da parede (~790 Pa)
+    if (code === "vw") return 450 + microOndulacao;   // Parede escarpada (~585 Pa)
+    if (code === "pc" || code === "p" || code === "pr") return Math.max(baseMola, 1450); // Planalto (~530 Pa)
     return baseMola;
 }
 
@@ -670,7 +679,6 @@ function calcularPontoPousoEAlvo(candorData) {
 let missaoAtivaStats = null;
 let missaoRotaWaypoints = [];
 
-// Função para abrir a explicação de qualquer unidade clicada na tabela
 function mostrarExplicacaoUnidade(uName) {
     const info = geologyCatalog[uName];
     const box = document.getElementById('unit-detail-box');
@@ -703,7 +711,6 @@ fetch('data/candor_chemistry.geojson')
         MISSION_CENTER.lon = centroPouso.lng;
         VIEWS.local.center = [centroPouso.lat, centroPouso.lng];
 
-        // Raio de 400 km ao redor do Local de Pouso
         L.circle(centroPouso, {
             pane: 'missionOverlayPane',
             radius: (RAIO_MATERIAIS_KM * 1000) / 0.532,
@@ -735,7 +742,6 @@ fetch('data/candor_chemistry.geojson')
             return false;
         });
 
-        // Preenche a Tabela Clicável de Cores na Barra Lateral
         const legendBody = document.getElementById('hydro-legend-body');
         if (legendBody) {
             let htmlTabela = "";
@@ -754,7 +760,6 @@ fetch('data/candor_chemistry.geojson')
             });
             legendBody.innerHTML = htmlTabela || `<div class="text-xs text-slate-400 py-2">Nenhuma unidade neste raio.</div>`;
 
-            // Ativa o clique em cada caixinha da tabela
             legendBody.querySelectorAll('.unit-row-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     mostrarExplicacaoUnidade(btn.getAttribute('data-unit'));
@@ -765,7 +770,7 @@ fetch('data/candor_chemistry.geojson')
         const geoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: featuresFiltradas400km }, {
             pane: 'geologyPane',
             coordsToLatLng: geoCoordsToLatLng,
-            interactive: false, // Deixa o clique no mapa livre para inspeção limpa de qualquer ponto
+            interactive: false,
             style: (feature) => {
                 const rawUnit = feature.properties.UName || feature.properties.uname || feature.properties.UNIT;
                 const uName = String(rawUnit).trim().toLowerCase();
@@ -792,7 +797,7 @@ fetch('data/candor_chemistry.geojson')
 
         geoJsonLayer.addTo(geologyGroup);
 
-        // Calcula a rota realista A* pelo fundo do cânion
+        // Calcula a rota oficial A* da missão
         const resultadoRota = calcularMelhorRotaAStar(missao.pousoLatLng, missao.alvoLatLng);
         missaoRotaWaypoints = resultadoRota.waypoints;
         missaoAtivaStats = analisarTrajetoriaCompleta(resultadoRota);
@@ -800,7 +805,7 @@ fetch('data/candor_chemistry.geojson')
         const pousoInfo = geologyCatalog[missao.pousoUnit];
         const alvoInfo = geologyCatalog[missao.alvoUnit];
 
-        // Preenche o Card Principal da Missão Tripulada Ativa com toda a Telemetria Oficial
+        // Preenche TODOS os dados da Missão Tripulada Ativa na barra lateral
         document.getElementById('mission-landing-unit').innerText = `${missao.setor} (${pousoInfo.code})`;
         document.getElementById('mission-target-unit').innerText = `${alvoInfo.name.split('(')[0].trim()} (${alvoInfo.code})`;
         document.getElementById('mission-target-dist').innerText = `${missaoAtivaStats.distanciaKm.toFixed(2)} km (~${missaoAtivaStats.tempoHoras.toFixed(1)}h)`;
@@ -810,7 +815,7 @@ fetch('data/candor_chemistry.geojson')
         document.getElementById('mission-slope').innerText = `${missaoAtivaStats.inclinacaoMaximaDeg.toFixed(1)}° (SEGURO)`;
         document.getElementById('mission-energy').innerText = `${missaoAtivaStats.consumoO2Gramas}g O₂ | ${missaoAtivaStats.gastoEnergeticoKwh.toFixed(1)} kWh`;
 
-        // Preenche a Justificativa Científica (APENAS Pouso e Destino) no ícone Diagnóstico
+        // Preenche Diagnóstico Científico
         const pousoAltM = getElevacaoRealista(missao.pousoLatLng, pousoInfo);
         const diagLandingEl = document.getElementById('diag-landing-text');
         const diagWaterEl = document.getElementById('diag-water-text');
@@ -861,12 +866,156 @@ fetch('data/candor_chemistry.geojson')
         alvoMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); alvoMarker.openPopup(); });
         alvoMarker.addTo(targetsGroup);
 
+        // Inicializa o Astronauta na Base de Pouso
+        inicializarAstronauta(missaoRotaWaypoints);
+
         map.flyTo(missao.pousoLatLng, 9, { duration: 1.2 });
     })
     .catch(err => console.error("Erro no GeoJSON:", err));
 
 // ============================================================================
-// 7. INSPEÇÃO DE LOCAL (ESTILO POUSO) & SIMULADOR DE ROTA DE TESTE RETRÁTIL
+// 7. SIMULAÇÃO AO VIVO DO ASTRONAUTA NA EXPEDIÇÃO (BIOMETRIA & AMBIENTE)
+// ============================================================================
+let astroMarker = null;
+let astroStepIndex = 0;
+let astroTimer = null;
+let astroO2Inicial = 1200;
+let astroBateriaInicial = 45.0;
+
+// Modelo Térmico e Barométrico Calibrado (TES / Mars Climate Database)
+function calcularAmbienteMarte(altitudeM, geoProp = null, lat = -6.5) {
+    // 1. Lei Barométrica Exponencial (P0 = 610 Pa, H = 11.100 m)
+    const pressaoPa = Math.round(610 * Math.exp(-altitudeM / 11100));
+
+    // 2. Inércia térmica da rocha
+    let bonusInerciaTermica = 0;
+    if (geoProp) {
+        const c = geoProp.code.toLowerCase();
+        if (c === "vl" || c === "vw") bonusInerciaTermica = +4.5;
+        if (c === "ch") bonusInerciaTermica = -2.0;
+    }
+
+    // 3. Efeito da latitude (afastamento do equador esfria ~0.95°C por grau)
+    const efeitoLatitude = Math.max(0, Math.abs(lat) - 6.5) * 0.95;
+
+    // 4. Temperatura diurna média (°C)
+    const tempC = Math.round(-28 - (altitudeM / 1000) * 3.2 + bonusInerciaTermica - efeitoLatitude);
+    const radTaxaHora = 0.024 * Math.exp(altitudeM / 22000);
+
+    return { pressaoPa, tempC, radTaxaHora };
+}
+
+function inicializarAstronauta(waypoints) {
+    if (!waypoints || waypoints.length === 0) return;
+    if (astroMarker) map.removeLayer(astroMarker);
+
+    const astroIcon = L.divIcon({
+        className: 'astro-hud-marker',
+        html: `<div style="width:28px;height:28px;background:#0f172a;border:2px solid #facc15;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 12px #facc15;">🧑‍🚀</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+
+    astroStepIndex = 0;
+    astroMarker = L.marker(waypoints[0], { icon: astroIcon, zIndexOffset: 1000 }).addTo(map);
+    atualizarTelemetriaAstronauta();
+}
+
+function atualizarTelemetriaAstronauta() {
+    if (!missaoRotaWaypoints || missaoRotaWaypoints.length === 0 || !astroMarker) return;
+
+    const totalSteps = missaoRotaWaypoints.length - 1;
+    const posAtual = missaoRotaWaypoints[astroStepIndex];
+    astroMarker.setLatLng(posAtual);
+
+    const progressoPct = totalSteps > 0 ? Math.round((astroStepIndex / totalSteps) * 100) : 0;
+
+    // Calcula distância percorrida e subida acumulada até o passo atual
+    let distPercorrida = 0;
+    let subidaPercorrida = 0;
+    for (let i = 0; i < astroStepIndex; i++) {
+        const pA = missaoRotaWaypoints[i];
+        const pB = missaoRotaWaypoints[i + 1];
+        distPercorrida += distanciaMarteKm(pA, pB);
+        const altA = getElevacaoRealista(pA, consultarGeologiaNoPonto(pA));
+        const altB = getElevacaoRealista(pB, consultarGeologiaNoPonto(pB));
+        if (altB > altA) subidaPercorrida += (altB - altA);
+    }
+
+    const geoAtual = consultarGeologiaNoPonto(posAtual);
+    const altAtual = getElevacaoRealista(posAtual, geoAtual);
+    const amb = calcularAmbienteMarte(altAtual, geoAtual, posAtual.lat);
+
+    const o2Gasto = Math.round((distPercorrida * 32) + (subidaPercorrida * 0.22));
+    const o2Restante = Math.max(0, astroO2Inicial - o2Gasto);
+    const o2Pct = Math.round((o2Restante / astroO2Inicial) * 100);
+
+    const kwhGasto = (distPercorrida * 0.42) + ((1800 * 3.72 * subidaPercorrida) / (3600000 * 0.75));
+    const kwhRestante = Math.max(0, astroBateriaInicial - kwhGasto);
+
+    const horasDecorridas = distPercorrida / 14.5;
+    const radAcumulada = horasDecorridas * amb.radTaxaHora;
+
+    document.getElementById('astro-progress-pct').innerText = `${progressoPct}% (${distPercorrida.toFixed(1)} km)`;
+    document.getElementById('astro-progress-bar').style.width = `${progressoPct}%`;
+    document.getElementById('astro-o2').innerText = `${o2Restante}g (${o2Pct}%)`;
+    document.getElementById('astro-battery').innerText = `${kwhRestante.toFixed(1)} kWh`;
+    document.getElementById('astro-alt').innerText = `${altAtual.toLocaleString('pt-BR')} m`;
+    document.getElementById('astro-pressure').innerText = `${amb.pressaoPa} Pa`;
+    document.getElementById('astro-temp').innerText = `${amb.tempC}°C`;
+    document.getElementById('astro-rad').innerText = `${radAcumulada.toFixed(3)} mSv`;
+}
+
+const btnAstroPlay = document.getElementById('btn-astro-play');
+const btnAstroStep = document.getElementById('btn-astro-step');
+const btnAstroReset = document.getElementById('btn-astro-reset');
+
+if (btnAstroPlay) {
+    btnAstroPlay.addEventListener('click', () => {
+        if (astroTimer) {
+            clearInterval(astroTimer);
+            astroTimer = null;
+            btnAstroPlay.innerText = "▶ Iniciar";
+            return;
+        }
+        if (astroStepIndex >= missaoRotaWaypoints.length - 1) astroStepIndex = 0;
+        btnAstroPlay.innerText = "⏸ Pausar";
+        astroTimer = setInterval(() => {
+            if (astroStepIndex < missaoRotaWaypoints.length - 1) {
+                astroStepIndex++;
+                atualizarTelemetriaAstronauta();
+            } else {
+                clearInterval(astroTimer);
+                astroTimer = null;
+                btnAstroPlay.innerText = "▶ Iniciar";
+            }
+        }, 650);
+    });
+}
+
+if (btnAstroStep) {
+    btnAstroStep.addEventListener('click', () => {
+        if (astroStepIndex < missaoRotaWaypoints.length - 1) {
+            astroStepIndex++;
+            atualizarTelemetriaAstronauta();
+        }
+    });
+}
+
+if (btnAstroReset) {
+    btnAstroReset.addEventListener('click', () => {
+        if (astroTimer) {
+            clearInterval(astroTimer);
+            astroTimer = null;
+            if (btnAstroPlay) btnAstroPlay.innerText = "▶ Iniciar";
+        }
+        astroStepIndex = 0;
+        atualizarTelemetriaAstronauta();
+    });
+}
+
+// ============================================================================
+// 8. INSPEÇÃO DE LOCAL & SIMULADOR DE ROTA DE TESTE (MANTÉM LINHA AO RECOLHER)
 // ============================================================================
 let modoSimuladorRotaTeste = false;
 let routePoints = [];
@@ -882,33 +1031,24 @@ if (toggleTestRouteBtn && testRoutePanel) {
         modoSimuladorRotaTeste = !modoSimuladorRotaTeste;
         if (modoSimuladorRotaTeste) {
             testRoutePanel.classList.remove('hidden');
-            testRouteBadge.innerText = "ATIVO (CLIQUE 2 PTS)";
+            testRouteBadge.innerText = "ABERTO (CLIQUE 2 PTS)";
             testRouteBadge.className = "text-[10px] font-['JetBrains_Mono'] text-cyan-300 font-bold";
         } else {
+            // Apenas oculta a sanfona, mas MANTÉM a linha de teste e seus dados salvos!
             testRoutePanel.classList.add('hidden');
-            testRouteBadge.innerText = "OCULTO";
+            testRouteBadge.innerText = routeLine ? "ROTA SALVA" : "OCULTO";
             testRouteBadge.className = "text-[10px] font-['JetBrains_Mono'] text-slate-400";
-            clearRoute();
         }
     });
 }
 
-// Calcula condições ambientais físicas a partir da altitude marciana
-function calcularAmbienteMarte(altitudeM) {
-    // Pressão barométrica marciana: P0 = 610 Pa a 0m, escala de altura H = 11.100m
-    const pressaoPa = Math.round(610 * Math.exp(-altitudeM / 11100));
-    // Temperatura média diurna no fundo do cânion (~ -20°C a -45°C conforme elevação)
-    const tempC = Math.round(-28 - (altitudeM / 1000) * 3.2);
-    return { pressaoPa, tempC };
-}
-
 map.on('click', (e) => {
-    // MODO 1 (Padrão): Clique esquerdo abre inspeção de local no exato estilo do popup de pouso
+    // MODO 1 (Quando Simulador de Teste está fechado): Inspeção detalhada do terreno
     if (!modoSimuladorRotaTeste) {
         const geo = consultarGeologiaNoPonto(e.latlng);
         const altM = getElevacaoRealista(e.latlng, geo);
         const setor = identificarSetorMarte(e.latlng.lat, e.latlng.lng);
-        const amb = calcularAmbienteMarte(altM);
+        const amb = calcularAmbienteMarte(altM, geo, e.latlng.lat);
         const distBase = distanciaMarteKm(e.latlng, L.latLng(MISSION_CENTER.lat, MISSION_CENTER.lon)).toFixed(2);
 
         const tituloUnidade = geo ? geo.name : "Platô Regolítico Não Mapeado";
@@ -923,7 +1063,7 @@ map.on('click', (e) => {
                     <span class="text-[10px] uppercase font-bold text-amber-400">INSPEÇÃO DE TERRENO // ${setor.toUpperCase()}</span>
                     <h3 class="font-bold text-sm mt-0.5 text-white">${tituloUnidade}</h3>
                     <div class="text-xs font-mono text-cyan-300 mt-1">Lat: ${e.latlng.lat.toFixed(3)}° | Lon: ${e.latlng.lng.toFixed(3)}° | Alt: ${altM} m</div>
-                    <div class="text-[11px] font-mono text-emerald-300 mt-0.5">Pressão: ${amb.pressaoPa} Pa | Temp. Média: ${amb.tempC}°C</div>
+                    <div class="text-[11px] font-mono text-emerald-300 mt-0.5">Pressão: ${amb.pressaoPa} Pa | Temp: ${amb.tempC}°C</div>
                     <p class="text-xs text-slate-300 mt-1.5 leading-relaxed">${descricaoLocal}</p>
                 </div>
             `)
@@ -931,7 +1071,7 @@ map.on('click', (e) => {
         return;
     }
 
-    // MODO 2 (Quando o Simulador de Rota de Teste está aberto): Traça rota A* entre 2 pontos
+    // MODO 2 (Quando Simulador de Teste está aberto): Traça rota de teste A* e exibe os dados
     if (routePoints.length >= 2) clearRoute();
 
     routePoints.push(e.latlng);
@@ -970,7 +1110,10 @@ map.on('click', (e) => {
 
 function clearRoute() {
     routePoints = [];
-    if (routeLine) map.removeLayer(routeLine);
+    if (routeLine) {
+        map.removeLayer(routeLine);
+        routeLine = null;
+    }
     routeMarkers.forEach(m => map.removeLayer(m));
     routeMarkers = [];
 
@@ -991,7 +1134,7 @@ if (clearRouteBtn) {
 }
 
 // ============================================================================
-// 8. CONTROLE DO ÍCONE DISCRETO DE DIAGNÓSTICO CIENTÍFICO
+// 9. CONTROLE DO ÍCONE DISCRETO DE DIAGNÓSTICO CIENTÍFICO
 // ============================================================================
 const toggleDiagBtn = document.getElementById('toggle-diagnosis-btn');
 const closeDiagBtn = document.getElementById('close-diagnosis-btn');
