@@ -18,6 +18,9 @@ const map = L.map('mars-map', {
 map.createPane('geologyPane');
 map.getPane('geologyPane').style.zIndex = 450;
 
+map.createPane('thermalPane');
+map.getPane('thermalPane').style.zIndex = 500;
+
 map.createPane('missionOverlayPane');
 map.getPane('missionOverlayPane').style.zIndex = 650;
 
@@ -796,6 +799,7 @@ fetch('data/candor_chemistry.geojson')
         });
 
         geoJsonLayer.addTo(geologyGroup);
+        if (map.hasLayer(thermalLayer)) thermalLayer.redraw();
 
         // Calcula a rota oficial A* da missão
         const resultadoRota = calcularMelhorRotaAStar(missao.pousoLatLng, missao.alvoLatLng);
@@ -903,6 +907,81 @@ function calcularAmbienteMarte(altitudeM, geoProp = null, lat = -6.5) {
     const radTaxaHora = 0.024 * Math.exp(altitudeM / 22000);
 
     return { pressaoPa, tempC, radTaxaHora };
+}
+
+const thermalLayer = L.gridLayer({
+    pane: 'thermalPane',
+    tileSize: 256,
+    updateWhenZooming: false
+});
+
+thermalLayer.createTile = function (coords, done) {
+    const tile = document.createElement('canvas');
+    const tileSize = this.options.tileSize;
+    const cellSize = 16;
+    const sampleSize = tileSize / cellSize;
+    tile.width = tileSize;
+    tile.height = tileSize;
+    const context = tile.getContext('2d');
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = sampleSize;
+    sampleCanvas.height = sampleSize;
+    const sampleContext = sampleCanvas.getContext('2d');
+    const colorStops = [
+        { temp: -60, color: [37, 99, 235] },
+        { temp: -40, color: [6, 182, 212] },
+        { temp: -25, color: [250, 204, 21] },
+        { temp: -5, color: [239, 68, 68] }
+    ];
+
+    for (let y = 0; y < tileSize; y += cellSize) {
+        for (let x = 0; x < tileSize; x += cellSize) {
+            const point = L.point(coords.x * tileSize + x + cellSize / 2, coords.y * tileSize + y + cellSize / 2);
+            const latlng = map.unproject(point, coords.z);
+            const geo = consultarGeologiaNoPonto(latlng);
+            const altitude = getElevacaoRealista(latlng, geo);
+            const temp = calcularAmbienteMarte(altitude, geo, latlng.lat).tempC;
+            const boundedTemp = Math.max(colorStops[0].temp, Math.min(colorStops[colorStops.length - 1].temp, temp));
+            let lower = colorStops[0];
+            let upper = colorStops[colorStops.length - 1];
+
+            for (let i = 0; i < colorStops.length - 1; i++) {
+                if (boundedTemp <= colorStops[i + 1].temp) {
+                    lower = colorStops[i];
+                    upper = colorStops[i + 1];
+                    break;
+                }
+            }
+
+            const ratio = (boundedTemp - lower.temp) / (upper.temp - lower.temp);
+            const red = Math.round(lower.color[0] + (upper.color[0] - lower.color[0]) * ratio);
+            const green = Math.round(lower.color[1] + (upper.color[1] - lower.color[1]) * ratio);
+            const blue = Math.round(lower.color[2] + (upper.color[2] - lower.color[2]) * ratio);
+            sampleContext.fillStyle = `rgba(${red}, ${green}, ${blue}, 0.52)`;
+            sampleContext.fillRect(x / cellSize, y / cellSize, 1, 1);
+        }
+    }
+
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(sampleCanvas, 0, 0, tileSize, tileSize);
+
+    requestAnimationFrame(() => done(null, tile));
+    return tile;
+};
+
+const toggleThermalEl = document.getElementById('toggle-thermal');
+if (toggleThermalEl) {
+    toggleThermalEl.addEventListener('change', (e) => {
+        const legend = document.getElementById('thermal-legend');
+        if (e.target.checked) {
+            map.addLayer(thermalLayer);
+            if (legend) legend.classList.remove('hidden');
+        } else {
+            map.removeLayer(thermalLayer);
+            if (legend) legend.classList.add('hidden');
+        }
+    });
 }
 
 function inicializarAstronauta(waypoints) {
