@@ -54,8 +54,9 @@ const AMBIENTE = {
 
 // ============================================================================
 // RESTRIÇÕES DE TERRENO (usadas pelo planejador de rota)
-// Cada tipo de risco deixa a célula mais "cara": a rota só passa por ela quando
-// o desvio seguro for muito mais longo. Declividade alta é sempre bloqueio.
+// A rota prioriza caminhos inteiramente seguros, mesmo que sejam mais longos.
+// Só permite risco quando não há caminho seguro; nesse caso, os custos abaixo
+// penalizam os trechos arriscados. Declividade alta é sempre bloqueio.
 // ============================================================================
 const RISCOS_TERRENO = {
     declividadeMedia: { custo: 4, nome: "Declividade média" },          // classe rosa do QGIS

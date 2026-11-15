@@ -126,7 +126,8 @@ const Terreno = (() => {
     const distanciaAteBloqueioKm = (id) => distBloqueio[id] * passo / 1000;
 
     // ------------------------------------------------------------------------
-    // A* na grade de 100 m (8 vizinhos, sem cortar cantos bloqueados).
+    // A* na grade de 100 m (8 vizinhos, sem cortar cantos não permitidos).
+    // Primeiro busca apenas células seguras; só admite risco se não houver rota segura.
     // Custo do passo = distância × média dos custos das duas células.
     // Heurística: distância octil × custo mínimo (1) → sempre acha a rota de menor custo.
     // ------------------------------------------------------------------------
@@ -178,6 +179,13 @@ const Terreno = (() => {
         if (tipo[a] === BLOQUEADA) return { ids: [], motivo: "A origem está em declividade alta (bloqueada)" };
         if (tipo[b] === BLOQUEADA) return { ids: [], motivo: "O destino está em declividade alta (bloqueada)" };
 
+        const segura = buscarRota(a, b, false);
+        return segura.ids.length ? segura : buscarRota(a, b, true);
+    }
+
+    function buscarRota(a, b, permitirRisco) {
+        const permitida = (id) => tipo[id] !== BLOQUEADA && (permitirRisco || tipo[id] === SEGURA);
+        if (!permitida(a) || !permitida(b)) return { ids: [] };
         limpar();
         const rb = Math.floor(b / colunas), cb = b % colunas;
         const h = (id) => {
@@ -197,8 +205,8 @@ const Terreno = (() => {
                 const nr = r + dr, nc = c + dc;
                 if (nr < 0 || nc < 0 || nr >= linhas || nc >= colunas) continue;
                 const n = nr * colunas + nc;
-                if (tipo[n] === BLOQUEADA || fechado[n]) continue;
-                if (dr && dc && (tipo[r * colunas + nc] === BLOQUEADA || tipo[nr * colunas + c] === BLOQUEADA)) continue;
+                if (!permitida(n) || fechado[n]) continue;
+                if (dr && dc && (!permitida(r * colunas + nc) || !permitida(nr * colunas + c))) continue;
                 const novo = g[id] + passo * mult * (cA + CUSTO[tipo[n]]) / 2;
                 if (novo < g[n]) {
                     if (g[n] === Infinity) tocados.push(n);

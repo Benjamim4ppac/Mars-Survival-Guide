@@ -274,6 +274,13 @@ function calcularAmbienteMarte(altitudeM, lat) {
 // ============================================================================
 // 7. ROTA (A* sobre o terreno real de 100 m)
 // ============================================================================
+function estiloRota(rota) {
+    return {
+        color: rota.bloqueada ? '#ef4444' : rota.usaRisco ? '#f59e0b' : '#22c55e',
+        dashArray: '8, 7'
+    };
+}
+
 function calcularRota(inicio, fim) {
     const r = Terreno.rota(inicio, fim);
     if (!r.ids.length) return { ids: [], waypoints: [inicio, fim], bloqueada: true, motivo: r.motivo, usaRisco: false };
@@ -586,8 +593,8 @@ function iniciarMissao() {
 
     L.polyline(m.rota.waypoints, {
         pane: 'missionOverlayPane',
-        color: m.rota.bloqueada || m.rota.usaRisco ? "#ef4444" : "#facc15",
-        weight: 3.5, interactive: false, dashArray: m.rota.bloqueada || m.rota.usaRisco ? '8, 7' : null
+        ...estiloRota(m.rota),
+        weight: 3.5, interactive: false
     }).addTo(targetsGroup);
 
     L.circleMarker(m.pouso, {
@@ -842,10 +849,9 @@ function adicionarPontoDeRota(latlng) {
     setTimeout(() => {
         const rota = calcularRota(routePoints[0], routePoints[1]);
         const st = analisarTrajetoria(rota);
-        const cor = st.decisao === "PODE SAIR" ? '#38bdf8' : st.decisao === "ATENÇÃO" ? '#f59e0b' : '#ef4444';
         routeLine = L.polyline(rota.waypoints, {
-            pane: 'missionOverlayPane', color: cor, weight: 3.5,
-            dashArray: st.bloqueada || st.usaRisco ? '8, 7' : null
+            pane: 'missionOverlayPane', weight: 3.5,
+            ...estiloRota(rota)
         }).addTo(map);
         if (st.bloqueada) {
             routeLine.bindPopup(`
