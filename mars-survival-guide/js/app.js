@@ -902,7 +902,18 @@ document.getElementById('close-diagnosis-btn').addEventListener('click', (e) => 
 });
 
 window.addEventListener('keydown', (e) => {
-    if (e.target.matches('input, textarea, select')) return;
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.closest('button, input, textarea, select, a, [contenteditable], dialog')) return;
+    if (e.key === '?') { e.preventDefault(); abrirAjudaTeclado(); return; }
+    if (e.key === 'Escape') {
+        if (!diagCard.classList.contains('hidden')) {
+            diagCard.classList.add('hidden');
+            document.getElementById('toggle-diagnosis-btn').focus();
+        }
+        map.closePopup();
+        return;
+    }
+    if (e.key.startsWith('Arrow') && e.target !== map.getContainer()) return;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     const k = e.key.toLowerCase();
     const passo = 140;
@@ -919,12 +930,16 @@ window.addEventListener('keydown', (e) => {
     else if (k === '2' && missaoAtual) map.flyTo(missaoAtual.alvo, 12, { duration: 0.8 });
     else if (k === 'p') alternarSimulacao();
     else if (k === 'm') alternarRotaTeste();
-    else if ((e.key === 'Enter' || e.code === 'Space') && modoRotaTeste) adicionarPontoDeRota(map.getCenter());
+    else if (e.key === 'Enter' || e.code === 'Space') {
+        e.preventDefault();
+        if (modoRotaTeste) adicionarPontoDeRota(map.getCenter());
+        else inspecionarTerreno(map.getCenter());
+    }
     else if (k === 'v') document.getElementById('toggle-slope').click();
     else if (k === 'h') document.getElementById('toggle-hydro').click();
     else if (k === 'i') document.getElementById('toggle-targets').click();
     else if (k === 't') document.getElementById('toggle-thermal').click();
-    else if (k === 'x' || e.key === 'Escape') clearRoute();
+    else if (k === 'x') clearRoute();
 });
 
 // ============================================================================
@@ -934,3 +949,26 @@ setTexto('leg-media', `${RISCOS_TERRENO.declividadeMedia.nome} (${RISCOS_TERRENO
 setTexto('leg-desab', `${RISCOS_TERRENO.zonaDesabamento.nome} (${RISCOS_TERRENO.zonaDesabamento.custo}×)`);
 setTexto('leg-caot', `${RISCOS_TERRENO.terrenoCaotico.nome} (${RISCOS_TERRENO.terrenoCaotico.custo}×)`);
 iniciarMissao();
+
+const ajudaTeclado = document.getElementById('keyboard-dialog');
+let focoAntesDaAjuda = null;
+function abrirAjudaTeclado() {
+    focoAntesDaAjuda = document.activeElement;
+    ajudaTeclado.showModal();
+}
+document.getElementById('keyboard-help').addEventListener('click', abrirAjudaTeclado);
+document.getElementById('close-keyboard').addEventListener('click', () => ajudaTeclado.close());
+ajudaTeclado.addEventListener('close', () => focoAntesDaAjuda?.focus());
+const botaoDiagnostico = document.getElementById('toggle-diagnosis-btn');
+botaoDiagnostico.setAttribute('aria-controls', 'mission-diagnosis-card');
+function sincronizarPaineis() {
+    botaoDiagnostico.setAttribute('aria-expanded', String(!diagCard.classList.contains('hidden')));
+    document.getElementById('toggle-test-route-btn').setAttribute('aria-expanded', String(modoRotaTeste));
+    testRouteBadge.textContent = modoRotaTeste ? 'SELECIONE 2 PONTOS' : (routeLine ? 'ROTA SALVA' : 'FECHADO');
+}
+new MutationObserver(sincronizarPaineis).observe(diagCard, { attributes: true, attributeFilter: ['class'] });
+new MutationObserver(sincronizarPaineis).observe(testRoutePanel, { attributes: true, attributeFilter: ['class'] });
+document.getElementById('toggle-test-route-btn').setAttribute('aria-controls', 'test-route-panel');
+document.getElementById('close-diagnosis-btn').addEventListener('click', () => botaoDiagnostico.focus());
+map.on('moveend', () => map.fire('mousemove', { latlng: map.getCenter() }));
+sincronizarPaineis();
