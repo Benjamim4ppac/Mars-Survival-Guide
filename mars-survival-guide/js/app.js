@@ -934,7 +934,17 @@ function mostrarRotaDemo(tecla) {
     map.fitBounds(L.latLngBounds([a, b]).pad(0.6));
     adicionarPontoDeRota(a);
     adicionarPontoDeRota(b);
+    map.getContainer().focus({ preventScroll: true });
 }
+
+// Teclas 7/8/9 funcionam com o foco em qualquer lugar (mapa, botão ou popup), menos em campos de texto
+document.addEventListener('keydown', (e) => {
+    if (!ROTAS_DEMO[e.key] || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (e.target.closest('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    mostrarRotaDemo(e.key);
+}, true);
 
 window.addEventListener('keydown', (e) => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -975,7 +985,6 @@ window.addEventListener('keydown', (e) => {
     else if (k === 'i') document.getElementById('toggle-targets').click();
     else if (k === 't') document.getElementById('toggle-thermal').click();
     else if (k === 'x') clearRoute();
-    else if (ROTAS_DEMO[k]) mostrarRotaDemo(k);
 });
 
 // ============================================================================
