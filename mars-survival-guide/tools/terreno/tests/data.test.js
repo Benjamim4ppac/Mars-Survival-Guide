@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {polygons,intersects,containsBox} from '../gerar_matriz.js';
+import {polygons,intersects,containsBox,build} from '../gerar_matriz.js';
+import {fileURLToPath} from 'node:url';
+// A matriz é gerada (e ignorada pelo git): cria se ainda não existir
+if(!fs.existsSync(new URL('../assets/matriz_navegacao.json',import.meta.url))) build(fileURLToPath(new URL('..',import.meta.url)),100);
 import {buildGraph,planRoute,validate} from '../router.worker.js';
 const read=name=>JSON.parse(fs.readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const index=list=>list.map(poly=>{

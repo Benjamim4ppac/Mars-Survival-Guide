@@ -859,6 +859,18 @@ function adicionarPontoDeRota(latlng) {
                     <div class="font-bold text-red-400 uppercase">⚠ Travessia bloqueada</div>
                     <p class="text-slate-300 mt-1">${st.motivo}.</p>
                 </div>`).openPopup();
+        } else {
+            // Parecer resumido na própria rota: veredito + regras que dispararam
+            const cor = st.decisao === "PODE SAIR" ? "text-emerald-300" : st.decisao === "ATENÇÃO" ? "text-amber-300" : "text-red-300";
+            const itens = st.bloqueios.map(t => `<li class="text-red-300">✕ ${t}</li>`)
+                .concat(st.atencoes.map(t => `<li class="text-amber-200">! ${t}</li>`));
+            const lista = itens.length ? itens.slice(0, 4).join('') : `<li class="text-emerald-300">✓ Todas as regras de segurança atendidas</li>`;
+            routeLine.bindPopup(`
+                <div class="font-sans text-xs max-w-xs">
+                    <div class="font-bold ${cor}">${st.decisao}</div>
+                    <div class="text-slate-300 mt-0.5">${st.distanciaKm.toFixed(1)} km (ida)</div>
+                    <ul class="mt-1.5 space-y-0.5">${lista}</ul>
+                </div>`).openPopup(rota.waypoints[Math.floor(rota.waypoints.length / 2)]);
         }
         preencherTelemetria('route', st);
     }, 30);
@@ -907,6 +919,23 @@ document.getElementById('close-diagnosis-btn').addEventListener('click', (e) => 
     e.stopPropagation(); diagCard.classList.add('hidden');
 });
 
+// Rotas de demonstração (teclas 7, 8 e 9): calculadas ao vivo, servem para apresentar e gravar a demo
+const ROTAS_DEMO = {
+    '7': { a: [-6.2986, -77.4753], b: [-6.50, -77.62] },     // desvio de parede
+    '8': { a: [-6.0, -76.6], b: [-5.5, -78.0] },             // cânion → planalto
+    '9': { a: [-5.9139, -77.6828], b: [-5.8127, -77.6828] }  // platô cercado por paredes
+};
+function mostrarRotaDemo(tecla) {
+    const demo = ROTAS_DEMO[tecla];
+    if (!demo) return;
+    clearRoute();
+    if (!modoRotaTeste) alternarRotaTeste();
+    const a = L.latLng(...demo.a), b = L.latLng(...demo.b);
+    map.fitBounds(L.latLngBounds([a, b]).pad(0.6));
+    adicionarPontoDeRota(a);
+    adicionarPontoDeRota(b);
+}
+
 window.addEventListener('keydown', (e) => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.target.closest('button, input, textarea, select, a, [contenteditable], dialog')) return;
@@ -946,6 +975,7 @@ window.addEventListener('keydown', (e) => {
     else if (k === 'i') document.getElementById('toggle-targets').click();
     else if (k === 't') document.getElementById('toggle-thermal').click();
     else if (k === 'x') clearRoute();
+    else if (ROTAS_DEMO[k]) mostrarRotaDemo(k);
 });
 
 // ============================================================================
