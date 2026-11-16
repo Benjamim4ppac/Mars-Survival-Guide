@@ -33,8 +33,8 @@ All parameters (costs, limits, rover, crew, suit) are in `mars-survival-guide/da
 
 | Data | Source | Use |
 |---|---|---|
-| Slope classes | Derived in QGIS from [PREENCHER: elevation model, e.g. MOLA/HRSC], medium = [PREENCHER]°, high = [PREENCHER]°, exported in IAU_2015:49912 | Where routes can go |
-| Image of the area | Exported from QGIS, [PREENCHER: source mosaic] | Offline base map |
+| Slope classes | Derived in QGIS from [Derived in QGIS from NASA MOLA elevation data (≈460 m pixels) as medium and high slope classes, exported in IAU_2015:49912 | Where routes can go |
+| Image of the area | Orbital image mosaic exported from QGIS | Offline base map |
 | Geologic units | USGS I-897, *Geologic Map of the Coprates Quadrangle of Mars* (McCauley, 1978), doi:10.3133/i897 | Water potential, landing/target selection |
 | Radiation reference | Curiosity RAD, ~0.67 mSv/day at Gale crater | Radiation estimate |
 | Oxygen reference | NASA life-support planning value, ~0.84 kg O₂ per person per day | Crew oxygen use |
@@ -68,9 +68,11 @@ All heavy processing happens before the mission; the app only reads the packaged
 
 ## Team and credits
 
-- Terrain pipeline (QGIS slope, rasterizer, router tests): Yoshida.
-- Mission app (geology, mission logic, interface): Benjamim.
-- [PREENCHER: Belita, Francisco, Gi, Gustavo e seus papéis]
+- Terrain pipeline (QGIS slope, rasterizer, safety-first routing, tests): Matheus Yoshida Pasini.
+- Mission app (geology, mission logic, map): Benjamim Martins Magalhães Sena.
+- Interface, keyboard navigation and English version: Isabela Turatti Silva.
+- Thermal layer: Francisco Tomaz Estevão.
+- Research, documentation and slides: Giovanna Fernandes.
 
 ## Use of AI
 
